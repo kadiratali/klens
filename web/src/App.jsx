@@ -9,6 +9,15 @@ import DetailPane from './components/DetailPane.jsx';
 
 const HEALTH_POLL_MS = 3000;
 
+// Live-mode polling backs off while the screen is idle and snaps back to the
+// fast rate as soon as something changes (or the user acts).
+function liveDelayMs(unchangedStreak) {
+  if (unchangedStreak < 3) return 1200;
+  if (unchangedStreak < 6) return 2000;
+  if (unchangedStreak < 10) return 3000;
+  return 5000;
+}
+
 function allIds(root) {
   const ids = new Set();
   (function walk(n) {
@@ -24,6 +33,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('inspect'); // 'inspect' | 'interact'
+  const [live, setLive] = useState(false);
 
   const [shot, setShot] = useState(null); // base64 png
   const [tree, setTree] = useState(null);
@@ -40,17 +50,29 @@ export default function App() {
     treeRef.current = tree;
   }, [tree]);
 
+  // Single-flight guard shared by manual refresh, live polling and actions.
+  const busyRef = useRef(false);
+  const pendingRef = useRef(false);
+  const unchangedStreakRef = useRef(0);
+
   const { byId, parentOf } = useMemo(
     () => (tree ? indexTree(tree) : { byId: new Map(), parentOf: new Map() }),
     [tree]
   );
   const space = useMemo(() => (tree ? boundsSpace(tree) : { w: 0, h: 0 }), [tree]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback(async ({ silent = false } = {}) => {
+    if (busyRef.current) {
+      // A capture is already running; run once more when it finishes.
+      pendingRef.current = true;
+      return;
+    }
+    busyRef.current = true;
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
       let res = await api.inspect(versionRef.current);
+      unchangedStreakRef.current = res.unchanged ? unchangedStreakRef.current + 1 : 0;
       if (!res.unchanged) {
         let nextTree = null;
         if (res.tree) {
@@ -84,15 +106,41 @@ export default function App() {
       setHits([]);
       versionRef.current = res.version ?? versionRef.current;
     } catch (err) {
-      setError(err.message);
+      // The reconnect banner already covers this state; don't stack an error on it.
+      if (err.code !== 'reconnecting') setError(err.message);
     } finally {
+      busyRef.current = false;
       setLoading(false);
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        refresh({ silent: true });
+      }
     }
   }, []);
 
   useEffect(() => {
     if (sessionId) refresh();
   }, [sessionId, refresh]);
+
+  // Live mode: setTimeout chain (never overlapping requests) with adaptive
+  // back-off while the screen is idle. Actions reset the streak so the loop
+  // speeds back up the moment something happens.
+  useEffect(() => {
+    if (!live || !sessionId) return;
+    let cancelled = false;
+    let timer;
+    const tick = async () => {
+      if (cancelled) return;
+      if (!busyRef.current) await refresh({ silent: true });
+      if (cancelled) return;
+      timer = setTimeout(tick, liveDelayMs(unchangedStreakRef.current));
+    };
+    timer = setTimeout(tick, liveDelayMs(0));
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [live, sessionId, refresh]);
 
   // Health polling: shows liveness and picks up the new session id after an
   // automatic reconnect (which then triggers a refresh via the effect above).
@@ -120,11 +168,12 @@ export default function App() {
     };
   }, [sessionId]);
 
-  // 'i' toggles inspect/interact unless the user is typing in a field.
+  // 'i' toggles inspect/interact, 'l' toggles live mode — unless typing in a field.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'i' || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-      setMode((m) => (m === 'inspect' ? 'interact' : 'inspect'));
+      if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      if (e.key === 'i') setMode((m) => (m === 'inspect' ? 'interact' : 'inspect'));
+      if (e.key === 'l') setLive((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -134,11 +183,15 @@ export default function App() {
   const runAction = useCallback(
     async (fn) => {
       setError(null);
+      busyRef.current = true; // hold off live polling while the action runs
       try {
         await fn();
       } catch (err) {
         setError(err.message);
+      } finally {
+        busyRef.current = false;
       }
+      unchangedStreakRef.current = 0; // screen likely changed: poll fast again
       await refresh();
     },
     [refresh]
@@ -216,6 +269,8 @@ export default function App() {
         health={health}
         mode={mode}
         onModeChange={setMode}
+        live={live}
+        onLiveChange={setLive}
         onPressKey={doPressKey}
         onSessionChange={setSessionId}
         onRefresh={refresh}

@@ -29,6 +29,11 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
     cihaza gerçek tap gönderir, sürükleme swipe olur, 600 ms+ basılı tutma long-press. Header'da
     back/home/recents tuşları; detay panelinde "Tap element" ve text yazma (Type / Clear & type).
     Her aksiyondan sonra görünüm otomatik tazelenir (diff ile).
+  - **Live mod** (`l` tuşu veya header'daki Live butonu): setTimeout zinciriyle örtüşmesiz polling.
+    Adaptif tempo — ekran değişiyorken 1.2 sn, boşta kademeli olarak 5 sn'ye kadar yavaşlar;
+    herhangi bir aksiyon veya değişiklik tempoyu anında sıfırlar. Ekran sabitken trafik
+    `unchanged` yanıtlarından ibarettir (tree parse edilmez, render tetiklenmez). Aksiyon
+    sırasında polling duraklar; reconnect sırasında hata bar'ı spam'lenmez.
 
 ## Çalıştırma
 

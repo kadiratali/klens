@@ -26,6 +26,8 @@ export default function SessionBar({
   health,
   mode,
   onModeChange,
+  live,
+  onLiveChange,
   onPressKey,
   onSessionChange,
   onRefresh,
@@ -166,6 +168,13 @@ export default function SessionBar({
               ▢
             </button>
           </div>
+          <button
+            className={`live-btn ${live ? 'on' : ''}`}
+            onClick={() => onLiveChange(!live)}
+            title="Auto-refresh while the screen changes (toggle with 'l')"
+          >
+            <span className="live-dot" /> Live
+          </button>
           <button onClick={onRefresh} disabled={loading}>
             {loading ? 'Capturing…' : 'Refresh'}
           </button>

@@ -12,7 +12,7 @@ React arayüzü (en-küçük-alan hit testing, çakışan aday listesi).
 **Tema:** "bak"tan "dokun"a. Ana kullanım: manuel keşif/debug.
 iOS kodu (parse/ölçekleme) korunur ama bu fazda doğrulanmaz.
 
-### Milestone 1 — Etkileşim
+### Milestone 1 — Etkileşim ✅
 
 Backend (`/api/action/*`):
 - `tap` — koordinata veya seçili elemente (bounds merkezine) W3C pointer actions ile
@@ -33,7 +33,7 @@ Kabul kriteri: emülatörde bir uygulamada login akışı (alan doldur, buton ta
 geri tuşu) yalnızca klens arayüzünden yürütülebilmeli; her adımda görüntü ve tree
 kendiliğinden güncellenmeli.
 
-### Milestone 2 — Canlı Mod
+### Milestone 2 — Canlı Mod ✅
 
 - Otomatik polling toggle'ı: ~1.5 sn'de bir `inspect?since` (unchanged ise render yok,
   bant genişliği ~sıfır)
