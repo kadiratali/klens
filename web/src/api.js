@@ -22,4 +22,9 @@ export const api = {
   getSource: () => request('/api/source'),
   inspect: (since) => request(since != null ? `/api/inspect?since=${since}` : '/api/inspect'),
   getHealth: () => request('/api/health'),
+  tap: (body) => request('/api/action/tap', { method: 'POST', body: JSON.stringify(body) }),
+  longPress: (body) => request('/api/action/longpress', { method: 'POST', body: JSON.stringify(body) }),
+  swipe: (body) => request('/api/action/swipe', { method: 'POST', body: JSON.stringify(body) }),
+  type: (body) => request('/api/action/type', { method: 'POST', body: JSON.stringify(body) }),
+  pressKey: (name) => request('/api/action/key', { method: 'POST', body: JSON.stringify({ name }) }),
 };

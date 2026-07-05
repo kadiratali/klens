@@ -23,6 +23,7 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('inspect'); // 'inspect' | 'interact'
 
   const [shot, setShot] = useState(null); // base64 png
   const [tree, setTree] = useState(null);
@@ -119,6 +120,56 @@ export default function App() {
     };
   }, [sessionId]);
 
+  // 'i' toggles inspect/interact unless the user is typing in a field.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'i' || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      setMode((m) => (m === 'inspect' ? 'interact' : 'inspect'));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Runs a device action, then re-captures so the view follows the device.
+  const runAction = useCallback(
+    async (fn) => {
+      setError(null);
+      try {
+        await fn();
+      } catch (err) {
+        setError(err.message);
+      }
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const doTap = useCallback(
+    (x, y) => runAction(() => api.tap({ x: Math.round(x), y: Math.round(y) })),
+    [runAction]
+  );
+  const doLongPress = useCallback(
+    (x, y, durationMs) =>
+      runAction(() => api.longPress({ x: Math.round(x), y: Math.round(y), durationMs })),
+    [runAction]
+  );
+  const doSwipe = useCallback(
+    (from, to, durationMs) =>
+      runAction(() =>
+        api.swipe({
+          from: { x: Math.round(from.x), y: Math.round(from.y) },
+          to: { x: Math.round(to.x), y: Math.round(to.y) },
+          durationMs: Math.min(Math.round(durationMs), 2000),
+        })
+      ),
+    [runAction]
+  );
+  const doType = useCallback(
+    (path, text, clear) => runAction(() => api.type({ path, text, clear })),
+    [runAction]
+  );
+  const doPressKey = useCallback((name) => runAction(() => api.pressKey(name)), [runAction]);
+
   const selectNode = useCallback(
     (id) => {
       setSelectedId(id);
@@ -163,6 +214,9 @@ export default function App() {
       <SessionBar
         sessionId={sessionId}
         health={health}
+        mode={mode}
+        onModeChange={setMode}
+        onPressKey={doPressKey}
         onSessionChange={setSessionId}
         onRefresh={refresh}
         loading={loading}
@@ -186,10 +240,14 @@ export default function App() {
         <ScreenshotPane
           shot={shot}
           space={space}
+          mode={mode}
           selected={selected}
           hover={hover}
           onHover={handleShotHover}
-          onClick={handleShotClick}
+          onInspectClick={handleShotClick}
+          onTap={doTap}
+          onLongPress={doLongPress}
+          onSwipe={doSwipe}
         />
         <TreePane
           tree={tree}
@@ -200,7 +258,13 @@ export default function App() {
           onSelect={selectNode}
           onHover={setHoverId}
         />
-        <DetailPane selected={selected} hits={hits} onSelect={selectNode} />
+        <DetailPane
+          selected={selected}
+          hits={hits}
+          onSelect={selectNode}
+          onTapElement={(path) => runAction(() => api.tap({ path }))}
+          onType={doType}
+        />
       </div>
     </div>
   );
