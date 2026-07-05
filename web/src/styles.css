@@ -185,6 +185,29 @@ button.primary {
   cursor: pointer;
 }
 
+.live-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.live-btn.on {
+  border-color: #6fd18a;
+  color: #6fd18a;
+}
+
+.live-btn.on .live-dot {
+  background: #6fd18a;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
 .tap-ripple {
   position: absolute;
   width: 28px;
