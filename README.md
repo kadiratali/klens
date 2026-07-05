@@ -7,7 +7,7 @@ Appium-based mobile UI inspector. Phase 1: Appium Inspector parity + better elem
 Grab a prebuilt installer from the [GitHub Releases](https://github.com/kadiratali/klens/releases) page:
 
 - **macOS** → `klens-<version>-universal.dmg` (Intel + Apple Silicon)
-- **Windows** → `klens-<version>-Setup.exe`
+- **Windows** → `klens-Setup-<version>.exe`
 
 > **Note (unsigned builds):** the app is not code-signed yet.
 > On macOS, on first launch **right-click → Open → Open** (a plain double-click
