@@ -6,147 +6,152 @@
 </p>
 
 <p align="center">
-  A mobile UI inspector, powered by Appium — desktop app for macOS &amp; Windows.
+  A mobile UI inspector for <b>Android &amp; iOS</b>, powered by Appium —<br/>
+  a desktop app for macOS &amp; Windows, with built-in cloud device support.
 </p>
 
 <p align="center">
   <a href="https://github.com/kadiratali/klens/releases/latest"><img src="https://img.shields.io/github/v/release/kadiratali/klens?label=version" alt="version" /></a>
   <a href="https://github.com/kadiratali/klens/releases"><img src="https://img.shields.io/github/downloads/kadiratali/klens/total?label=downloads" alt="downloads" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="platforms" />
+  <img src="https://img.shields.io/badge/target-Android%20%7C%20iOS-3ddc84" alt="targets" />
 </p>
 
 ---
 
-Appium-based mobile UI inspector. Phase 1: Appium Inspector parity + better element matching.
+**klens** is an Appium-based inspector for mobile apps — like Appium Inspector,
+but with sharper element matching, resilient sessions, and a locator engine that
+tells you **which selector is robust and why**. Point it at a local emulator or a
+cloud device (BrowserStack) and inspect, tap, type, and generate locators.
 
-## Download (desktop app)
+<p align="center">
+  <img src="assets/screenshot.png" alt="klens inspecting an iOS app on a BrowserStack device — screen, element tree, attributes, and robustness-scored locators" width="900" />
+</p>
 
-Grab a prebuilt installer from the [GitHub Releases](https://github.com/kadiratali/klens/releases) page:
+## ✨ Why klens
 
-- **macOS** → `klens-<version>-universal.dmg` (Intel + Apple Silicon)
-- **Windows** → `klens-Setup-<version>.exe`
+- **Locator robustness scoring** — every suggested selector gets a `robust` /
+  `moderate` / `fragile` rating (0–100) with reasons: it flags compiler-generated
+  ids, dynamic/dated text, and index-based fragility. *Appium Inspector suggests
+  locators; klens tells you which one will survive the next build.*
+- **Smarter hit-testing** — clicks match the **smallest bounding box**, not the
+  deepest node, so overlays and full-screen containers resolve correctly. Every
+  overlapping candidate at a point is listed and switchable.
+- **Resilient by design** — when a session dies (UiAutomator2 / WDA crash) it
+  **auto-reconnects** with backoff, preserving your tree and selection.
+- **Live mode** — adaptive polling follows the device hands-free; near-zero
+  traffic while the screen is idle.
+- **Cloud-ready** — connect a **BrowserStack** account in two clicks and inspect
+  real cloud devices, no local Appium needed.
+- **Cross-platform** — one app for Android and iOS, on macOS and Windows.
 
-> **Note (unsigned builds):** the app is not code-signed yet, so macOS/Windows
-> block it on first launch.
->
-> **macOS** — a double-click shows *"klens Not Opened / Apple could not verify…"*
-> with only **Done** / **Move to Trash** (click **Done**). Then either:
-> - **System Settings → Privacy & Security** → scroll to Security → next to
->   *"klens was blocked…"* click **Open Anyway** → confirm; or
-> - run in Terminal: `xattr -dr com.apple.quarantine /Applications/klens.app`
->   then open it normally.
->
-> **Windows** — SmartScreen → **More info → Run anyway**.
+## ⬇️ Download
 
-The app runs its own embedded Appium proxy server (port 3100), so no separate
-Node install is needed. You only need an Appium server running as usual.
+Grab a prebuilt installer from the [**Releases**](https://github.com/kadiratali/klens/releases) page:
 
-## Architecture
+| Platform | File |
+| --- | --- |
+| **macOS** (Intel + Apple Silicon) | `klens-<version>-universal.dmg` |
+| **Windows** | `klens-Setup-<version>.exe` |
 
-- **server/** — Node.js + Express (port 3100). Proxies to the Appium server over W3C REST (no WebdriverIO):
-  - `GET /api/inspect?since=<v>` → screenshot (Base64) + hierarchy in one call. Race-guarded capture
-    (source → [screenshot ∥ source], retries 3× if the hash doesn't match, then `consistent: false`).
-    If `since` matches the client's version, only the **diff** is returned (`added/removed/changed`);
-    if the hierarchy didn't change at all, `unchanged: true`.
-  - `GET /api/health` → session health (`ok | degraded | reconnecting | dead`), with a `window/rect`
-    ping every 4s. When a session dies (UiAutomator2/WDA crash, session-dead), a new session is opened
-    automatically with the same capabilities using exponential backoff (1s→30s, up to 8 attempts);
-    the diff baseline and client state are preserved.
-  - `GET /api/screenshot`, `GET /api/source` — individual endpoints (parity).
-  - `GET /api/sessions`, `POST /api/session`, `POST /api/session/attach` (validation ping before
-    attach), `DELETE /api/session`, `POST /api/appium-url`.
-  - Errors are classified (`server/src/errors.js`): a meaningful description + stable code
-    (`uia2-crash`, `wda-crash`, `session-dead`, `appium-unreachable`) instead of the raw driver message.
-  - `POST /api/action/*` — interaction (Phase 1 / M1): `tap` and `longpress` (coordinate or element
-    `path` — center computed from the snapshot), `swipe` (from/to + duration, W3C pointer actions),
-    `type` (find element by XPath and sendKeys, optional `clear`), `key` (back/home/recents).
-  - `GET /api/locators?path=` — locator suggestions for the selected element (accessibility-id,
-    resource-id, text, class+instance, optimized short XPath). Each suggestion is validated against
-    the current snapshot and returned with a match count (1 = unique); XPath candidates try simple
-    attribute forms first, then a form relative to the nearest ancestor with a unique resource-id,
-    and finally an absolute path. No request is sent to the device.
-  - `POST /api/search` — search over the snapshot: `text` (text + content-desc substring),
-    `id` (resource-id substring) or `xpath` (real XPath 1.0 engine); returns the list of matching paths.
-- **web/** — Vite + React (dev: 5173, `/api` → 3100 proxy; after `vite build` the backend serves
-  `web/dist` from 3100 — a single port is enough). Screenshot + XML tree + element detail panels;
-  a live health indicator in the header, reconnect/inconsistency warning bars. Because a node's
-  identity is its XPath, the selection is preserved across refreshes.
-  - **Inspect / Interact mode** (toggle with `i`): in Inspect, a click selects an element; in
-    Interact, a click sends a real tap to the device, a drag becomes a swipe, and a 600 ms+ hold is a
-    long-press. Header has back/home/recents keys; the detail panel has "Tap element" and text entry
-    (Type / Clear & type). The view auto-refreshes after every action (via diff).
-  - **Search + locator panel** (Phase 1 / M3): a Text / ID / XPath search bar in the tree panel —
-    matches are marked in the tree and highlighted together with green frames on the screenshot.
-    A "Suggested locators" table in the detail panel: uniqueness badge (`unique` / `×N`), raw selector
-    copy, and one-line Java / Python / JS (WebdriverIO) code snippets.
-  - **Live mode** (`l` key or the Live button in the header): non-overlapping polling via a setTimeout
-    chain. Adaptive cadence — 1.2s while the screen is changing, gradually backing off to 5s while
-    idle; any action or change resets the cadence instantly. While the screen is static, traffic is
-    just `unchanged` responses (the tree isn't parsed, no render is triggered). Polling pauses during
-    an action; the error bar isn't spammed during reconnect.
+> **First launch (unsigned builds):** the app is not code-signed yet, so the OS
+> blocks it once.
+> - **macOS** — click **Done** on the warning, then **System Settings → Privacy &
+>   Security → Open Anyway**. (Or run `xattr -dr com.apple.quarantine /Applications/klens.app`.)
+> - **Windows** — SmartScreen → **More info → Run anyway**.
 
-## Running
+The app bundles its own Appium proxy server, so **no separate Node install is
+needed** — you only need a running Appium server (local) or a cloud account.
+
+## 🚀 Getting started
+
+1. Launch klens and point it at a device:
+   - **Local** — enter your Appium URL (default `http://127.0.0.1:4723`), then
+     **List sessions → Attach**, or **New session…** with a capabilities JSON.
+   - **Cloud** — click **☁ Cloud → BrowserStack**, enter your username + access
+     key, then **New session…** with your `bs://` app and device caps.
+2. **Refresh** (or toggle **Live**) to capture the screen + hierarchy.
+3. Click any element to inspect it, read its attributes, and copy a **suggested
+   locator** (with a robustness badge) as a one-line Java / Python / JS snippet.
+
+## 🧭 Features
+
+- **Inspect / Interact modes** (`i`) — inspect selects elements; interact sends
+  real taps, drags become swipes, and a long hold is a long-press. Type text into
+  a field (Type / Clear & type), plus Android back / home / recents keys. The view
+  auto-refreshes after every action.
+- **Search** — find elements by Text / ID / XPath; matches are highlighted in the
+  tree and on the screenshot.
+- **Suggested locators** — accessibility-id, resource-id, text, class+instance,
+  and an optimized short XPath, each validated for uniqueness against the current
+  snapshot (no device round-trip) and ranked by robustness.
+- **Live mode** (`l`) — non-overlapping adaptive polling that follows the device
+  and quiets down when idle.
+- **Cloud providers** — BrowserStack today; the picker lists more (coming soon).
+
+## ☁️ Cloud devices (BrowserStack)
+
+1. **☁ Cloud → BrowserStack** → enter your username + access key (stored locally).
+2. Upload an app to BrowserStack to get a `bs://` id:
+   ```sh
+   curl -u "USER:KEY" -X POST "https://api-cloud.browserstack.com/app-automate/upload" \
+     -F "file=@/path/to/app.apk"
+   ```
+3. **New session…** with cloud caps, e.g.:
+   ```json
+   {
+     "platformName": "android",
+     "appium:automationName": "UiAutomator2",
+     "appium:app": "bs://<app-id>",
+     "bstack:options": { "deviceName": "Samsung Galaxy S23", "osVersion": "13.0" }
+   }
+   ```
+Credentials are sent as HTTP Basic auth and injected into `bstack:options`; they
+never leave your machine except to BrowserStack.
+
+## 🛠️ Run from source
 
 ```sh
 npm install
-npm run dev         # server + web together (browser)
-npm run dev:desktop # server + web + Electron window (desktop)
+npm run dev          # server + web in the browser (http://localhost:5173)
+npm run dev:desktop  # server + web + Electron window (desktop)
 ```
 
-For the browser: `http://localhost:5173` → enter the Appium URL → **List sessions** → **Attach**
-(or **New session…** with a capabilities JSON to open a new session) → **Refresh**. In the desktop
-version the same UI opens directly in the Electron window.
+Environment variables: `APPIUM_URL` (default `http://127.0.0.1:4723`),
+`PORT` (backend, default `3100`).
 
-Environment variables: `APPIUM_URL` (default `http://127.0.0.1:4723`), `PORT` (backend, default 3100).
-
-## Desktop (Electron)
-
-`desktop/` — wraps the existing Express server and React UI in an Electron shell without changing
-them (an Appium Inspector–style desktop app).
-
-- **Dev** (`npm run dev:desktop`): server + Vite start via `concurrently`, and the Electron window
-  loads the Vite dev URL (`5173`) — HMR works as usual. The window waits with `waitForUrl` until the
-  target URL responds (no blank screen on cold start).
-- **Native menu**: standard roles (reload, devtools, zoom, copy/paste) + a "klens" menu:
-  **Toggle Inspect/Interact** (Cmd/Ctrl+I) and **Toggle Live** (Cmd/Ctrl+L) — identical to the
-  `i`/`l` keyboard shortcuts. Menu actions are delivered to the UI via IPC (`menu-action`) through
-  `preload.js`; in the browser build `window.klens` is undefined, so this code path is a no-op.
-- **Packaged run**: the Electron main process starts the server itself with the bundled Node runtime
-  (`ELECTRON_RUN_AS_NODE`) and loads the single-port URL (`3100`); no separate Node install is needed.
-  The server is compiled into a single file (`desktop/build/server.cjs`) with `esbuild` and embedded
-  as a resource together with `web/dist`.
-
-### Packaging and publishing
-
-Local build (for your current platform):
+## 📦 Build & release
 
 ```sh
-npm run dist            # web build + server bundle + electron-builder
+npm run dist   # web build + server bundle + electron-builder → desktop/dist/
 ```
 
-Artifacts land under `desktop/dist/` (`.dmg` / `.exe`).
-
-**Publishing (download link):** push a version tag — `.github/workflows/release.yml` builds the
-installers on GitHub Actions macOS and Windows runners and uploads them to
-[GitHub Releases](https://github.com/kadiratali/klens/releases):
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds macOS
+and Windows installers on their runners and publishes them to GitHub Releases:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
-Builds are unsigned until a code-signing certificate is added (see the note above).
+## 🔍 How it works
 
-## Differences from Appium Inspector
+- **`server/`** — Node + Express (port 3100), proxying to Appium over W3C REST
+  (no WebdriverIO). One `GET /api/inspect` returns a race-guarded screenshot +
+  hierarchy, and **incremental diffs** between refreshes (only `added/removed/changed`).
+  A health loop pings the session every 4s and drives auto-reconnect. Interaction,
+  locator, and search endpoints live under `/api/action/*`, `/api/locators`, `/api/search`.
+- **`web/`** — Vite + React. Screenshot + XML tree + detail panels; a node's
+  identity is its XPath, so selection survives refreshes.
+- **`desktop/`** — an Electron shell that reuses the same server + UI. Packaged
+  builds bundle the server (via `esbuild`) and `web/dist` as resources and run on
+  a single port; no separate Node needed.
 
-- Click matching is done by **smallest bounding-box area** rather than the deepest DFS node (far more
-  accurate on overlays and full-screen containers).
-- **All overlapping candidates** at a point are listed; switch between them with the chips in the detail panel.
-- `displayed="false"` / `visible="false"` elements are excluded from hit testing (they still show in the tree).
-- Live highlight on hover; tree ↔ screenshot selection is synced both ways.
+See [ROADMAP.md](ROADMAP.md) for what's built and what's next.
 
-## Coordinate spaces
+## Notes
 
-- Android (uiautomator2): `bounds="[x1,y1][x2,y2]"` in pixels — matches the screenshot pixels exactly.
-- iOS (XCUITest): `x/y/width/height` in points; since the screenshot is in pixels, scaling is done
-  proportionally via the hierarchy's total bounding box (`boundsSpace`).
+- **Coordinate spaces** — Android (uiautomator2) reports `bounds` in pixels
+  (1:1 with the screenshot); iOS (XCUITest) reports points, scaled proportionally
+  via the hierarchy's total bounding box.
+- **iOS** — inspect, tap, and text entry are verified on BrowserStack; iOS-specific
+  locator strategies (class chain / predicate) are on the roadmap.
