@@ -42,6 +42,8 @@ export default function App() {
   const [hoverId, setHoverId] = useState(null);
   const [hits, setHits] = useState([]); // overlapping candidates at last click
   const [expanded, setExpanded] = useState(() => new Set());
+  const [searchMatches, setSearchMatches] = useState([]); // matched node paths
+  const [locators, setLocators] = useState(null); // suggestions for selected node
 
   // Refs so refresh() can diff against the latest tree without re-creating itself.
   const versionRef = useRef(null);
@@ -261,6 +263,47 @@ export default function App() {
   // if the element no longer exists on screen.
   const selected = selectedId != null ? byId.get(selectedId) || null : null;
   const hover = hoverId != null ? byId.get(hoverId) || null : null;
+  const matchNodes = useMemo(
+    () => searchMatches.map((p) => byId.get(p)).filter(Boolean),
+    [searchMatches, byId]
+  );
+
+  // Locator suggestions for the selected element (computed server-side on the
+  // snapshot; refreshed when the selection or the tree changes).
+  useEffect(() => {
+    if (!selected) {
+      setLocators(null);
+      return;
+    }
+    let stale = false;
+    api
+      .locators(selected.path)
+      .then((res) => !stale && setLocators(res.locators))
+      .catch(() => !stale && setLocators(null));
+    return () => {
+      stale = true;
+    };
+  }, [selected]);
+
+  const runSearch = useCallback(
+    async (strategy, query) => {
+      if (!query) {
+        setSearchMatches([]);
+        return 0;
+      }
+      setError(null);
+      try {
+        const res = await api.search(strategy, query);
+        setSearchMatches(res.matches);
+        if (res.matches.length) selectNode(res.matches[0]);
+        return res.total;
+      } catch (err) {
+        setError(err.message);
+        return 0;
+      }
+    },
+    [selectNode]
+  );
 
   return (
     <div className="app">
@@ -303,6 +346,7 @@ export default function App() {
           onTap={doTap}
           onLongPress={doLongPress}
           onSwipe={doSwipe}
+          matches={matchNodes}
         />
         <TreePane
           tree={tree}
@@ -312,10 +356,13 @@ export default function App() {
           setExpanded={setExpanded}
           onSelect={selectNode}
           onHover={setHoverId}
+          matchSet={searchMatches}
+          onSearch={runSearch}
         />
         <DetailPane
           selected={selected}
           hits={hits}
+          locators={locators}
           onSelect={selectNode}
           onTapElement={(path) => runAction(() => api.tap({ path }))}
           onType={doType}

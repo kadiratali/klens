@@ -242,6 +242,141 @@ button.primary {
   min-width: 140px;
 }
 
+/* ---- search & locators ---- */
+.search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-count {
+  font-size: 11px;
+  color: #6fd18a;
+  white-space: nowrap;
+}
+
+.search-count.none {
+  color: #ff9a9a;
+}
+
+.tree-row.match {
+  background: rgba(111, 209, 138, 0.1);
+  box-shadow: inset 2px 0 0 #6fd18a;
+}
+
+.match-overlay {
+  border: 1.5px solid rgba(111, 209, 138, 0.9);
+  background: rgba(111, 209, 138, 0.08);
+}
+
+.match-overlay.current {
+  border-width: 2.5px;
+}
+
+.locators {
+  border-top: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.locators-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+}
+
+.locators-head h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.lang-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.lang-switch button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.lang-switch button.active {
+  background: var(--accent);
+  color: #0b1017;
+}
+
+.locator-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.locator-table td {
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.locator-table td:first-child {
+  padding-left: 12px;
+}
+
+.loc-strategy {
+  color: var(--muted);
+  white-space: nowrap;
+  width: 1%;
+}
+
+.loc-selector {
+  font-family: ui-monospace, monospace;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loc-actions {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.loc-actions button {
+  padding: 2px 8px;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.badge.unique {
+  background: rgba(111, 209, 138, 0.15);
+  color: #6fd18a;
+}
+
+.badge.dupe {
+  background: rgba(255, 154, 77, 0.15);
+  color: #ff9a4d;
+}
+
 /* ---- layout ---- */
 .main {
   flex: 1;

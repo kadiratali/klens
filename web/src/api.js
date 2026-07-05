@@ -31,4 +31,7 @@ export const api = {
   swipe: (body) => request('/api/action/swipe', { method: 'POST', body: JSON.stringify(body) }),
   type: (body) => request('/api/action/type', { method: 'POST', body: JSON.stringify(body) }),
   pressKey: (name) => request('/api/action/key', { method: 'POST', body: JSON.stringify({ name }) }),
+  locators: (path) => request(`/api/locators?path=${encodeURIComponent(path)}`),
+  search: (strategy, query) =>
+    request('/api/search', { method: 'POST', body: JSON.stringify({ strategy, query }) }),
 };

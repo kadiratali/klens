@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 function nodeLabel(node) {
   const a = node.attrs;
@@ -8,13 +8,14 @@ function nodeLabel(node) {
   return { shortTag, id, text };
 }
 
-function TreeNode({ node, selectedId, hoverId, expanded, onToggle, onSelect, onHover }) {
+function TreeNode({ node, selectedId, hoverId, matchSet, expanded, onToggle, onSelect, onHover }) {
   const isOpen = expanded.has(node.id);
   const { shortTag, id, text } = nodeLabel(node);
   const classes = [
     'tree-row',
     node.id === selectedId && 'selected',
     node.id === hoverId && 'hovered',
+    matchSet.has(node.id) && 'match',
   ]
     .filter(Boolean)
     .join(' ');
@@ -53,6 +54,7 @@ function TreeNode({ node, selectedId, hoverId, expanded, onToggle, onSelect, onH
             node={child}
             selectedId={selectedId}
             hoverId={hoverId}
+            matchSet={matchSet}
             expanded={expanded}
             onToggle={onToggle}
             onSelect={onSelect}
@@ -63,10 +65,52 @@ function TreeNode({ node, selectedId, hoverId, expanded, onToggle, onSelect, onH
   );
 }
 
+function SearchBar({ onSearch }) {
+  const [strategy, setStrategy] = useState('text');
+  const [query, setQuery] = useState('');
+  const [total, setTotal] = useState(null);
+
+  async function run() {
+    setTotal(await onSearch(strategy, query));
+  }
+
+  function clear() {
+    setQuery('');
+    setTotal(null);
+    onSearch(strategy, '');
+  }
+
+  return (
+    <div className="search-row">
+      <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
+        <option value="text">Text</option>
+        <option value="id">ID</option>
+        <option value="xpath">XPath</option>
+      </select>
+      <input
+        placeholder={strategy === 'xpath' ? '//android.widget.Button[@text="OK"]' : 'Search…'}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') run();
+          if (e.key === 'Escape') clear();
+        }}
+      />
+      <button onClick={run}>Find</button>
+      {total != null && (
+        <span className={`search-count ${total ? '' : 'none'}`}>{total} match{total === 1 ? '' : 'es'}</span>
+      )}
+      {total != null && <button onClick={clear}>✕</button>}
+    </div>
+  );
+}
+
 export default function TreePane({
   tree,
   selectedId,
   hoverId,
+  matchSet,
+  onSearch,
   expanded,
   setExpanded,
   onSelect,
@@ -90,12 +134,14 @@ export default function TreePane({
   return (
     <section className="tree-pane">
       <h2>Source</h2>
+      <SearchBar onSearch={onSearch} />
       {tree ? (
         <div className="tree-scroll">
           <TreeNode
             node={tree}
             selectedId={selectedId}
             hoverId={hoverId}
+            matchSet={new Set(matchSet)}
             expanded={expanded}
             onToggle={toggle}
             onSelect={onSelect}

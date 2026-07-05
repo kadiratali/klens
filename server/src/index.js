@@ -15,6 +15,7 @@ import {
   rectCenter,
   ANDROID_KEYCODES,
 } from './actions.js';
+import { suggestLocators, xpathMatches } from './locators.js';
 
 const PORT = process.env.PORT || 3100;
 const RACE_GUARD_MAX_ATTEMPTS = 3;
@@ -204,7 +205,7 @@ app.get(
 
     const tree = parsePageSource(capture.xml);
     const version = (prev?.version || 0) + 1;
-    state.snapshot = { version, xmlHash, tree };
+    state.snapshot = { version, xmlHash, tree, xml: capture.xml };
 
     if (prev && since === prev.version) {
       const diff = diffTrees(prev.tree, tree);
@@ -226,6 +227,57 @@ app.get(
       }
     }
     res.json({ version, tree, ...meta });
+  })
+);
+
+// --- Locators & search (computed on the stored snapshot, no device round trip) ---
+
+function requireSnapshot() {
+  if (!state.snapshot) throw new HttpError(409, 'No snapshot yet. Refresh first.');
+  return state.snapshot;
+}
+
+app.get(
+  '/api/locators',
+  wrap(async (req, res) => {
+    const snap = requireSnapshot();
+    const nodePath = req.query.path;
+    if (!nodePath) throw new HttpError(400, 'path query parameter is required');
+    const node = findNodeByPath(snap.tree, nodePath);
+    if (!node) throw new HttpError(404, `Element not found in current snapshot: ${nodePath}`);
+    res.json({ locators: suggestLocators(node, snap.tree, snap.xml) });
+  })
+);
+
+app.post(
+  '/api/search',
+  wrap(async (req, res) => {
+    const snap = requireSnapshot();
+    const { strategy = 'text', query } = req.body || {};
+    if (!query) throw new HttpError(400, 'query is required');
+    let matches;
+    if (strategy === 'xpath') {
+      try {
+        matches = xpathMatches(snap.xml, query);
+      } catch (err) {
+        throw new HttpError(400, `Invalid XPath: ${err.message}`);
+      }
+    } else {
+      const needle = String(query).toLowerCase();
+      const preds = {
+        text: (n) =>
+          `${n.attrs.text || ''}\n${n.attrs['content-desc'] || ''}`.toLowerCase().includes(needle),
+        id: (n) => (n.attrs['resource-id'] || '').toLowerCase().includes(needle),
+      };
+      const pred = preds[strategy];
+      if (!pred) throw new HttpError(400, `Unknown strategy "${strategy}". Use text, id or xpath.`);
+      matches = [];
+      (function walk(n) {
+        if (pred(n)) matches.push(n.path);
+        n.children.forEach(walk);
+      })(snap.tree);
+    }
+    res.json({ matches, total: matches.length });
   })
 );
 

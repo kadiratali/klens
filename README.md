@@ -21,6 +21,13 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
   - `POST /api/action/*` — etkileşim (Faz 1 / M1): `tap` ve `longpress` (koordinat veya element
     `path`'i — merkez snapshot'tan hesaplanır), `swipe` (from/to + süre, W3C pointer actions),
     `type` (XPath ile element bulup sendKeys, opsiyonel `clear`), `key` (back/home/recents).
+  - `GET /api/locators?path=` — seçili element için locator önerileri (accessibility-id,
+    resource-id, text, class+instance, optimize edilmiş kısa XPath). Her öneri mevcut snapshot
+    üzerinde doğrulanır ve eşleşme sayısıyla döner (1 = benzersiz); XPath adayları önce basit
+    attribute formları, sonra benzersiz resource-id'li en yakın ancestor'a göre göreli form,
+    en son mutlak path olarak denenir. Cihaza istek atılmaz.
+  - `POST /api/search` — snapshot üzerinde arama: `text` (text + content-desc substring),
+    `id` (resource-id substring) veya `xpath` (gerçek XPath 1.0 motoru); eşleşen path listesi döner.
 - **web/** — Vite + React (dev: 5173, `/api` → 3100 proxy; `vite build` sonrası backend `web/dist`'i
   3100'den servis eder — tek port yeter). Screenshot + XML tree + element detay panelleri; header'da
   canlı sağlık göstergesi, reconnect/tutarsızlık uyarı barları. Node kimliği XPath olduğundan seçim
@@ -29,6 +36,10 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
     cihaza gerçek tap gönderir, sürükleme swipe olur, 600 ms+ basılı tutma long-press. Header'da
     back/home/recents tuşları; detay panelinde "Tap element" ve text yazma (Type / Clear & type).
     Her aksiyondan sonra görünüm otomatik tazelenir (diff ile).
+  - **Arama + locator paneli** (Faz 1 / M3): tree panelinde Text / ID / XPath arama çubuğu —
+    eşleşmeler tree'de işaretlenir ve screenshot'ta yeşil çerçevelerle topluca gösterilir.
+    Detay panelinde "Suggested locators" tablosu: benzersizlik rozeti (`unique` / `×N`),
+    ham selector kopyalama ve Java / Python / JS (WebdriverIO) tek satırlık kod snippet'i.
   - **Live mod** (`l` tuşu veya header'daki Live butonu): setTimeout zinciriyle örtüşmesiz polling.
     Adaptif tempo — ekran değişiyorken 1.2 sn, boşta kademeli olarak 5 sn'ye kadar yavaşlar;
     herhangi bir aksiyon veya değişiklik tempoyu anında sıfırlar. Ekran sabitken trafik
