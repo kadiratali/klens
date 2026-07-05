@@ -24,6 +24,10 @@ but with sharper element matching, resilient sessions, and a locator engine that
 tells you **which selector is robust and why**. Point it at a local emulator or a
 cloud device (BrowserStack) and inspect, tap, type, and generate locators.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="klens inspecting an iOS app on a BrowserStack device — screen, element tree, attributes, and robustness-scored locators" width="900" />
+</p>
+
 ## ✨ Why klens
 
 - **Locator robustness scoring** — every suggested selector gets a `robust` /
