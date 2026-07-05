@@ -389,6 +389,38 @@ app.post(
   })
 );
 
+// The absolute tree path (rooted at the synthetic AppiumAUT/hierarchy node)
+// does not match when the device re-runs the XPath, so locate the element by a
+// unique attribute instead — works for Android (resource-id/content-desc/text)
+// and iOS (name/label/value).
+function deviceLocatorXPath(node) {
+  const a = node.attrs || {};
+  const tag = node.tag;
+  const q = (s) => (String(s).includes('"') ? `'${s}'` : `"${s}"`);
+  const count = (attr, val) => {
+    let n = 0;
+    (function walk(x) {
+      if (!x) return;
+      if ((x.attrs || {})[attr] === val) n++;
+      (x.children || []).forEach(walk);
+    })(state.snapshot?.tree);
+    return n;
+  };
+  const tries = [
+    ['name', a.name], // iOS accessibility id
+    ['content-desc', a['content-desc']], // Android accessibility id
+    ['resource-id', a['resource-id']],
+    ['text', a.text],
+    ['label', a.label],
+    ['value', a.value],
+  ];
+  for (const [attr, val] of tries) {
+    if (val && count(attr, val) === 1) return `//${tag}[@${attr}=${q(val)}]`;
+  }
+  // Fallback: drop the synthetic root so the path can match on the device.
+  return node.path.replace(/^\/(AppiumAUT|hierarchy)\[\d+\]/, '') || node.path;
+}
+
 app.post(
   '/api/action/type',
   wrap(async (req, res) => {
@@ -396,14 +428,22 @@ app.post(
     const { path: nodePath, text, clear = false } = req.body || {};
     if (!nodePath) throw new HttpError(400, 'type requires an element path');
     if (typeof text !== 'string') throw new HttpError(400, 'type requires text');
+    const node = findNodeByPath(state.snapshot?.tree, nodePath);
+    const xpath = node ? deviceLocatorXPath(node) : nodePath;
     const body = await appium(`/session/${sessionId}/element`, {
       method: 'POST',
-      body: JSON.stringify({ using: 'xpath', value: nodePath }),
+      body: JSON.stringify({ using: 'xpath', value: xpath }),
       timeoutMs: 15000,
     });
     const el = body.value || {};
     const elementId = el['element-6066-11e4-a52e-4f735466cecf'] || el.ELEMENT;
     if (!elementId) throw new HttpError(502, 'Could not locate element on device for typing.');
+    // Focus the field first: iOS (XCUITest) often ignores setValue unless the
+    // field has keyboard focus. Best-effort — some elements aren't clickable.
+    await appium(`/session/${sessionId}/element/${elementId}/click`, {
+      method: 'POST',
+      body: '{}',
+    }).catch(() => {});
     if (clear) {
       await appium(`/session/${sessionId}/element/${elementId}/clear`, { method: 'POST', body: '{}' });
     }
