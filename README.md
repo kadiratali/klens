@@ -1,4 +1,21 @@
-# klens — Mobile Inspector
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png" />
+    <img src="assets/logo-light.png" alt="klens" width="360" />
+  </picture>
+</p>
+
+<p align="center">
+  A mobile UI inspector, powered by Appium — desktop app for macOS &amp; Windows.
+</p>
+
+<p align="center">
+  <a href="https://github.com/kadiratali/klens/releases/latest"><img src="https://img.shields.io/github/v/release/kadiratali/klens?label=version" alt="version" /></a>
+  <a href="https://github.com/kadiratali/klens/releases"><img src="https://img.shields.io/github/downloads/kadiratali/klens/total?label=downloads" alt="downloads" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="platforms" />
+</p>
+
+---
 
 Appium-based mobile UI inspector. Phase 1: Appium Inspector parity + better element matching.
 
