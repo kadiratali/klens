@@ -60,6 +60,7 @@ export default function SessionBar({
   const [showCloud, setShowCloud] = useState(false);
   const [provider, setProvider] = useState(null);
   const [bsUsername, setBsUsername] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -129,6 +130,7 @@ export default function SessionBar({
       onError('Capabilities is not valid JSON.');
       return;
     }
+    setCreating(true);
     try {
       // A cloud provider already set the URL + auth; setAppiumUrl would clear them.
       if (!provider) await api.setAppiumUrl(appiumUrl);
@@ -137,6 +139,8 @@ export default function SessionBar({
       onSessionChange(id);
     } catch (err) {
       onError(err.message);
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -259,14 +263,32 @@ export default function SessionBar({
         </>
       )}
       {showCaps && (
-        <div className="modal-backdrop" onClick={() => setShowCaps(false)}>
+        <div className="modal-backdrop" onClick={() => !creating && setShowCaps(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>New session capabilities</h3>
-            <textarea value={caps} onChange={(e) => setCaps(e.target.value)} rows={10} />
+            <textarea
+              value={caps}
+              onChange={(e) => setCaps(e.target.value)}
+              rows={10}
+              disabled={creating}
+            />
+            {creating && (
+              <div className="session-starting">
+                <span className="spinner" />
+                <span>
+                  Starting session…{' '}
+                  {provider === 'browserstack'
+                    ? 'the cloud device is being allocated and the app installed — this can take up to a minute.'
+                    : 'launching on the device…'}
+                </span>
+              </div>
+            )}
             <div className="modal-actions">
-              <button onClick={() => setShowCaps(false)}>Cancel</button>
-              <button className="primary" onClick={createSession}>
-                Start session
+              <button onClick={() => setShowCaps(false)} disabled={creating}>
+                Cancel
+              </button>
+              <button className="primary" onClick={createSession} disabled={creating}>
+                {creating ? 'Starting…' : 'Start session'}
               </button>
             </div>
           </div>
