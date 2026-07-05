@@ -26,10 +26,17 @@ Grab a prebuilt installer from the [GitHub Releases](https://github.com/kadirata
 - **macOS** → `klens-<version>-universal.dmg` (Intel + Apple Silicon)
 - **Windows** → `klens-Setup-<version>.exe`
 
-> **Note (unsigned builds):** the app is not code-signed yet.
-> On macOS, on first launch **right-click → Open → Open** (a plain double-click
-> shows a "developer cannot be verified" warning). On Windows, SmartScreen →
-> "More info → Run anyway".
+> **Note (unsigned builds):** the app is not code-signed yet, so macOS/Windows
+> block it on first launch.
+>
+> **macOS** — a double-click shows *"klens Not Opened / Apple could not verify…"*
+> with only **Done** / **Move to Trash** (click **Done**). Then either:
+> - **System Settings → Privacy & Security** → scroll to Security → next to
+>   *"klens was blocked…"* click **Open Anyway** → confirm; or
+> - run in Terminal: `xattr -dr com.apple.quarantine /Applications/klens.app`
+>   then open it normally.
+>
+> **Windows** — SmartScreen → **More info → Run anyway**.
 
 The app runs its own embedded Appium proxy server (port 3100), so no separate
 Node install is needed. You only need an Appium server running as usual.

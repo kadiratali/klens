@@ -9,6 +9,7 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const http = require('node:http');
+const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 
 const isDev = !app.isPackaged;
@@ -16,6 +17,10 @@ const SERVER_PORT = process.env.PORT || 3100;
 const DEV_URL = 'http://localhost:5173';
 const PROD_URL = `http://localhost:${SERVER_PORT}`;
 const APP_URL = isDev ? DEV_URL : PROD_URL;
+
+// Packaged builds carry the icon in the app bundle; in dev we set it at runtime
+// so the dock/taskbar shows the klens logo instead of the default Electron icon.
+const ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
 let serverProc = null;
 let win = null;
@@ -94,6 +99,7 @@ async function createWindow() {
     height: 900,
     show: false,
     title: 'klens',
+    icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -117,6 +123,11 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && app.dock && fs.existsSync(ICON_PATH)) {
+    try {
+      app.dock.setIcon(ICON_PATH);
+    } catch {}
+  }
   if (!isDev) startServer();
   buildMenu();
   await createWindow();

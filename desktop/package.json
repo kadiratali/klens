@@ -1,7 +1,7 @@
 {
   "name": "klens-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "klens — Appium-based mobile UI inspector (desktop)",
   "author": "Kadir Atali",
   "main": "main.js",

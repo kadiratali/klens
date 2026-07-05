@@ -2,6 +2,11 @@ import { HttpError, classify, FATAL_SESSION_CODES } from './errors.js';
 
 export const state = {
   appiumUrl: process.env.APPIUM_URL || 'http://127.0.0.1:4723',
+  // Cloud-provider auth (e.g. BrowserStack): { username, accessKey } or null for
+  // a local/unauthenticated Appium server. Sent as HTTP Basic on every request.
+  appiumAuth: null,
+  // Selected cloud provider id ('browserstack') or null for a plain Appium URL.
+  provider: null,
   sessionId: null,
   // W3C payload used to create the session; null when attached to an external
   // session (then we cannot recreate it, only report it dead).
@@ -26,12 +31,18 @@ const MAX_RECONNECT_ATTEMPTS = 8;
 
 export async function appium(path, { timeoutMs, ...options } = {}) {
   const url = state.appiumUrl.replace(/\/+$/, '') + path;
+  const authHeaders = {};
+  if (state.appiumAuth) {
+    const { username, accessKey } = state.appiumAuth;
+    const token = Buffer.from(`${username}:${accessKey}`).toString('base64');
+    authHeaders.Authorization = `Basic ${token}`;
+  }
   let res;
   try {
     res = await fetch(url, {
       ...options,
       signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: { 'Content-Type': 'application/json', ...authHeaders, ...(options.headers || {}) },
     });
   } catch (err) {
     throw new HttpError(

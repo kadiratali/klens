@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import CloudProviderModal from './CloudProviderModal.jsx';
 
 const DEFAULT_CAPS = `{
   "platformName": "Android",
@@ -7,6 +8,23 @@ const DEFAULT_CAPS = `{
   "appium:noReset": true,
   "appium:newCommandTimeout": 0
 }`;
+
+// Pre-filled when connected to BrowserStack. Credentials go via the Basic-auth
+// header (not caps), so the user only edits device/app here.
+const BROWSERSTACK_CAPS = `{
+  "platformName": "Android",
+  "appium:automationName": "UiAutomator2",
+  "appium:deviceName": "Google Pixel 7",
+  "appium:platformVersion": "13.0",
+  "appium:app": "bs://<your-uploaded-app-id>",
+  "bstack:options": {
+    "projectName": "klens",
+    "sessionName": "inspect",
+    "debug": true
+  }
+}`;
+
+const BS_STORE_KEY = 'klens.browserstack';
 
 function HealthChip({ health }) {
   if (!health) return null;
@@ -39,15 +57,41 @@ export default function SessionBar({
   const [pickedSession, setPickedSession] = useState('');
   const [showCaps, setShowCaps] = useState(false);
   const [caps, setCaps] = useState(DEFAULT_CAPS);
+  const [showCloud, setShowCloud] = useState(false);
+  const [provider, setProvider] = useState(null);
+  const [bsUsername, setBsUsername] = useState('');
 
   useEffect(() => {
-    api
-      .getState()
-      .then((s) => {
-        setAppiumUrl(s.appiumUrl);
-        if (s.sessionId) onSessionChange(s.sessionId);
-      })
-      .catch(() => {});
+    async function init() {
+      let s;
+      try {
+        s = await api.getState();
+      } catch {
+        return;
+      }
+      // Restore a saved BrowserStack connection: the desktop server starts fresh
+      // each launch, so re-apply the locally stored credentials to the backend.
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(BS_STORE_KEY) || 'null');
+      } catch {}
+      if (saved?.username && saved?.accessKey && !s.sessionId) {
+        try {
+          const r = await api.setProvider({ provider: 'browserstack', ...saved });
+          setProvider('browserstack');
+          setBsUsername(saved.username);
+          setAppiumUrl(r.appiumUrl);
+          setCaps(BROWSERSTACK_CAPS);
+          return;
+        } catch {
+          // fall through to plain state on failure
+        }
+      }
+      setAppiumUrl(s.appiumUrl);
+      setProvider(s.provider || null);
+      if (s.sessionId) onSessionChange(s.sessionId);
+    }
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,6 +145,28 @@ export default function SessionBar({
     onSessionChange(null);
   }
 
+  async function connectProvider({ username, accessKey }) {
+    const r = await api.setProvider({ provider: 'browserstack', username, accessKey });
+    localStorage.setItem(BS_STORE_KEY, JSON.stringify({ username, accessKey }));
+    setProvider('browserstack');
+    setBsUsername(username);
+    setAppiumUrl(r.appiumUrl);
+    setCaps(BROWSERSTACK_CAPS);
+    setShowCloud(false);
+  }
+
+  async function disconnectProvider() {
+    try {
+      const r = await api.setProvider({ provider: null });
+      setAppiumUrl(r.appiumUrl);
+    } catch {}
+    localStorage.removeItem(BS_STORE_KEY);
+    setProvider(null);
+    setBsUsername('');
+    setCaps(DEFAULT_CAPS);
+    setShowCloud(false);
+  }
+
   function sessionLabel(s) {
     const c = s.capabilities;
     const device = c['appium:deviceName'] || c.deviceName || c['appium:udid'] || '';
@@ -115,8 +181,17 @@ export default function SessionBar({
         value={appiumUrl}
         onChange={(e) => setAppiumUrl(e.target.value)}
         placeholder="Appium server URL"
-        disabled={!!sessionId}
+        disabled={!!sessionId || !!provider}
       />
+      {!sessionId && (
+        <button
+          className={`cloud-btn${provider ? ' on' : ''}`}
+          onClick={() => setShowCloud(true)}
+          title="Connect through a cloud provider"
+        >
+          {provider === 'browserstack' ? '☁ BrowserStack' : '☁ Cloud'}
+        </button>
+      )}
       {!sessionId ? (
         <>
           <button onClick={loadSessions}>List sessions</button>
@@ -194,6 +269,15 @@ export default function SessionBar({
             </div>
           </div>
         </div>
+      )}
+      {showCloud && (
+        <CloudProviderModal
+          initialUsername={bsUsername}
+          connected={provider === 'browserstack'}
+          onConnect={connectProvider}
+          onDisconnect={disconnectProvider}
+          onClose={() => setShowCloud(false)}
+        />
       )}
     </header>
   );

@@ -53,8 +53,19 @@ const wrap = (fn) => (req, res) =>
 
 // --- Connection / session management ---------------------------------------
 
+// Known cloud providers. Only BrowserStack is wired up for now; others are
+// surfaced in the UI as "coming soon".
+const CLOUD_PROVIDERS = {
+  browserstack: { name: 'BrowserStack', appiumUrl: 'https://hub-cloud.browserstack.com/wd/hub' },
+};
+
 app.get('/api/state', (req, res) => {
-  res.json({ appiumUrl: state.appiumUrl, sessionId: state.sessionId });
+  res.json({
+    appiumUrl: state.appiumUrl,
+    sessionId: state.sessionId,
+    provider: state.provider,
+    hasAuth: !!state.appiumAuth,
+  });
 });
 
 app.get('/api/health', (req, res) => {
@@ -65,8 +76,35 @@ app.post('/api/appium-url', (req, res) => {
   const { appiumUrl } = req.body || {};
   if (!appiumUrl) return res.status(400).json({ error: 'appiumUrl is required' });
   state.appiumUrl = appiumUrl;
+  // A plain URL means no cloud provider — drop any stored auth.
+  state.appiumAuth = null;
+  state.provider = null;
   resetSession();
   res.json({ appiumUrl: state.appiumUrl });
+});
+
+// Connect through a cloud provider (BrowserStack): point the Appium URL at the
+// provider hub and store credentials, sent as HTTP Basic on every request.
+app.post('/api/provider', (req, res) => {
+  const { provider, username, accessKey } = req.body || {};
+  if (provider == null) {
+    // Clear provider, revert to a local Appium server.
+    state.provider = null;
+    state.appiumAuth = null;
+    state.appiumUrl = process.env.APPIUM_URL || 'http://127.0.0.1:4723';
+    resetSession();
+    return res.json({ provider: null, appiumUrl: state.appiumUrl });
+  }
+  const conf = CLOUD_PROVIDERS[provider];
+  if (!conf) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  if (!username || !accessKey) {
+    return res.status(400).json({ error: 'username and accessKey are required' });
+  }
+  state.provider = provider;
+  state.appiumUrl = conf.appiumUrl;
+  state.appiumAuth = { username, accessKey };
+  resetSession();
+  res.json({ provider, appiumUrl: state.appiumUrl });
 });
 
 app.get(
