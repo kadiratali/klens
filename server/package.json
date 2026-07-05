@@ -8,8 +8,10 @@
     "start": "node src/index.js"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.9.10",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "fast-xml-parser": "^4.5.0"
+    "fast-xml-parser": "^4.5.0",
+    "xpath": "^0.0.34"
   }
 }

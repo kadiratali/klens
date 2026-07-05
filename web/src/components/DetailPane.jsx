@@ -1,11 +1,72 @@
 import React, { useState } from 'react';
+import { locatorSnippet, SNIPPET_LANGS, STRATEGY_LABELS } from '../snippets.js';
 
 function isTypable(node) {
   const cls = node.attrs.class || node.tag;
   return /EditText|TextField|SearchView|AutoComplete/i.test(cls) || node.attrs.focusable === 'true';
 }
 
-export default function DetailPane({ selected, hits, onSelect, onTapElement, onType }) {
+function LocatorTable({ locators }) {
+  const [lang, setLang] = useState('java');
+  const [copied, setCopied] = useState(null);
+
+  function copy(key, value) {
+    navigator.clipboard.writeText(value);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 900);
+  }
+
+  return (
+    <div className="locators">
+      <div className="locators-head">
+        <h3>Suggested locators</h3>
+        <div className="lang-switch">
+          {SNIPPET_LANGS.map((l) => (
+            <button key={l} className={lang === l ? 'active' : ''} onClick={() => setLang(l)}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <table className="locator-table">
+        <tbody>
+          {locators.map((loc) => {
+            const key = `${loc.strategy}:${loc.selector}`;
+            return (
+              <tr key={key}>
+                <td className="loc-strategy">{STRATEGY_LABELS[loc.strategy] || loc.strategy}</td>
+                <td className="loc-selector" title={loc.selector}>
+                  {loc.selector}
+                </td>
+                <td>
+                  <span
+                    className={`badge ${loc.matches === 1 ? 'unique' : 'dupe'}`}
+                    title={loc.matches === 1 ? 'Matches exactly one element' : 'Matches multiple elements'}
+                  >
+                    {loc.matches === 1 ? 'unique' : `×${loc.matches}`}
+                  </span>
+                </td>
+                <td className="loc-actions">
+                  <button onClick={() => copy(key, loc.selector)}>
+                    {copied === key ? '✓' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={() => copy(key + lang, locatorSnippet(lang, loc))}
+                    title={locatorSnippet(lang, loc)}
+                  >
+                    {copied === key + lang ? '✓' : 'Code'}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function DetailPane({ selected, hits, locators, onSelect, onTapElement, onType }) {
   const [text, setText] = useState('');
   return (
     <section className="detail-pane">
@@ -52,6 +113,7 @@ export default function DetailPane({ selected, hits, onSelect, onTapElement, onT
               Clear & type
             </button>
           </div>
+          {locators && locators.length > 0 && <LocatorTable locators={locators} />}
           <table className="attr-table">
             <tbody>
               {Object.entries(selected.attrs).map(([key, value]) => (

@@ -27,6 +27,7 @@ export default function ScreenshotPane({
   onTap,
   onLongPress,
   onSwipe,
+  matches = [],
 }) {
   const imgRef = useRef(null);
   const dragRef = useRef(null);
@@ -103,6 +104,17 @@ export default function ScreenshotPane({
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
         />
+        {space.w > 0 &&
+          matches.slice(0, 60).map(
+            (n) =>
+              n.rect && (
+                <div
+                  key={n.id}
+                  className={`overlay match-overlay ${n.id === selected?.id ? 'current' : ''}`}
+                  style={rectStyle(n.rect, space)}
+                />
+              )
+          )}
         {mode === 'inspect' && hover?.rect && space.w > 0 && (
           <div className="overlay hover-overlay" style={rectStyle(hover.rect, space)} />
         )}
