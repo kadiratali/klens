@@ -125,10 +125,23 @@ app.get(
   })
 );
 
+// BrowserStack authenticates session creation via userName/accessKey inside
+// bstack:options; inject the stored credentials so it works even when a Basic
+// auth header alone is not honored.
+function withProviderCreds(caps) {
+  if (state.provider !== 'browserstack' || !state.appiumAuth) return caps;
+  const { username, accessKey } = state.appiumAuth;
+  const inject = (c) => ({
+    ...c,
+    'bstack:options': { ...(c['bstack:options'] || {}), userName: username, accessKey },
+  });
+  return caps.alwaysMatch ? { ...caps, alwaysMatch: inject(caps.alwaysMatch) } : inject(caps);
+}
+
 app.post(
   '/api/session',
   wrap(async (req, res) => {
-    const caps = req.body?.capabilities || {};
+    const caps = withProviderCreds(req.body?.capabilities || {});
     const payload = caps.alwaysMatch || caps.firstMatch
       ? { capabilities: caps }
       : { capabilities: { alwaysMatch: caps, firstMatch: [{}] } };

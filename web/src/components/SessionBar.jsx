@@ -98,7 +98,8 @@ export default function SessionBar({
   async function loadSessions() {
     onError(null);
     try {
-      await api.setAppiumUrl(appiumUrl);
+      // A cloud provider already set the URL + auth; setAppiumUrl would clear them.
+      if (!provider) await api.setAppiumUrl(appiumUrl);
       const { sessions: list } = await api.listSessions();
       setSessions(list);
       setPickedSession(list.length ? list[0].id : '');
@@ -129,7 +130,8 @@ export default function SessionBar({
       return;
     }
     try {
-      await api.setAppiumUrl(appiumUrl);
+      // A cloud provider already set the URL + auth; setAppiumUrl would clear them.
+      if (!provider) await api.setAppiumUrl(appiumUrl);
       const { sessionId: id } = await api.createSession(parsed);
       setShowCaps(false);
       onSessionChange(id);
