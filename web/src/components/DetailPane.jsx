@@ -32,6 +32,8 @@ function LocatorTable({ locators }) {
         <tbody>
           {locators.map((loc) => {
             const key = `${loc.strategy}:${loc.selector}`;
+            const r = loc.robustness;
+            const reasonText = r?.reasons.map((x) => `[${x.type}] ${x.text}`).join('\n');
             return (
               <tr key={key}>
                 <td className="loc-strategy">{STRATEGY_LABELS[loc.strategy] || loc.strategy}</td>
@@ -46,6 +48,13 @@ function LocatorTable({ locators }) {
                     {loc.matches === 1 ? 'unique' : `×${loc.matches}`}
                   </span>
                 </td>
+                {r && (
+                  <td>
+                    <span className={`robustness-badge ${r.label}`} title={reasonText}>
+                      {r.label} {r.score}
+                    </span>
+                  </td>
+                )}
                 <td className="loc-actions">
                   <button onClick={() => copy(key, loc.selector)}>
                     {copied === key ? '✓' : 'Copy'}

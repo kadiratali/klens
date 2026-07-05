@@ -377,6 +377,29 @@ button.primary {
   color: #ff9a4d;
 }
 
+.robustness-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.robustness-badge.robust {
+  background: rgba(111, 209, 138, 0.15);
+  color: #6fd18a;
+}
+
+.robustness-badge.moderate {
+  background: rgba(255, 213, 77, 0.15);
+  color: #ffd54d;
+}
+
+.robustness-badge.fragile {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+}
+
 /* ---- layout ---- */
 .main {
   flex: 1;
