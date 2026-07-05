@@ -16,6 +16,8 @@ export const api = {
   getState: () => request('/api/state'),
   setAppiumUrl: (appiumUrl) =>
     request('/api/appium-url', { method: 'POST', body: JSON.stringify({ appiumUrl }) }),
+  setProvider: (body) =>
+    request('/api/provider', { method: 'POST', body: JSON.stringify(body) }),
   listSessions: () => request('/api/sessions'),
   attachSession: (sessionId) =>
     request('/api/session/attach', { method: 'POST', body: JSON.stringify({ sessionId }) }),
