@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-export default function DetailPane({ selected, hits, onSelect }) {
+function isTypable(node) {
+  const cls = node.attrs.class || node.tag;
+  return /EditText|TextField|SearchView|AutoComplete/i.test(cls) || node.attrs.focusable === 'true';
+}
+
+export default function DetailPane({ selected, hits, onSelect, onTapElement, onType }) {
+  const [text, setText] = useState('');
   return (
     <section className="detail-pane">
       <h2>Element</h2>
@@ -28,6 +34,23 @@ export default function DetailPane({ selected, hits, onSelect }) {
               {selected.path}
             </code>
             <button onClick={() => navigator.clipboard.writeText(selected.path)}>Copy</button>
+          </div>
+          <div className="element-actions">
+            <button onClick={() => onTapElement(selected.path)} disabled={!selected.rect}>
+              Tap element
+            </button>
+            <input
+              placeholder={isTypable(selected) ? 'Text to type…' : 'Text (element may not accept input)'}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onType(selected.path, text, false);
+              }}
+            />
+            <button onClick={() => onType(selected.path, text, false)}>Type</button>
+            <button onClick={() => onType(selected.path, text, true)} title="Clear the field first">
+              Clear & type
+            </button>
           </div>
           <table className="attr-table">
             <tbody>

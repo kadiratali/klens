@@ -122,6 +122,7 @@ async function reconnectLoop(code, rawMessage) {
 /** Feed any request/ping failure into the health state machine. */
 export function noteFailure(err) {
   const code = err.code || classify(err.message).code;
+  console.warn(`session failure [${code}]: ${err.message}`);
   state.health.lastCheckAt = Date.now();
   if (FATAL_SESSION_CODES.includes(code)) {
     reconnectLoop(code, err.message);

@@ -4,7 +4,8 @@ import { api } from '../api.js';
 const DEFAULT_CAPS = `{
   "platformName": "Android",
   "appium:automationName": "UiAutomator2",
-  "appium:noReset": true
+  "appium:noReset": true,
+  "appium:newCommandTimeout": 0
 }`;
 
 function HealthChip({ health }) {
@@ -20,7 +21,17 @@ function HealthChip({ health }) {
   );
 }
 
-export default function SessionBar({ sessionId, health, onSessionChange, onRefresh, loading, onError }) {
+export default function SessionBar({
+  sessionId,
+  health,
+  mode,
+  onModeChange,
+  onPressKey,
+  onSessionChange,
+  onRefresh,
+  loading,
+  onError,
+}) {
   const [appiumUrl, setAppiumUrl] = useState('http://127.0.0.1:4723');
   const [sessions, setSessions] = useState([]);
   const [pickedSession, setPickedSession] = useState('');
@@ -130,6 +141,31 @@ export default function SessionBar({ sessionId, health, onSessionChange, onRefre
             session {sessionId.slice(0, 8)}…
           </span>
           <HealthChip health={health} />
+          <div className="mode-switch" title="Toggle with the 'i' key">
+            <button
+              className={mode === 'inspect' ? 'active' : ''}
+              onClick={() => onModeChange('inspect')}
+            >
+              Inspect
+            </button>
+            <button
+              className={mode === 'interact' ? 'active' : ''}
+              onClick={() => onModeChange('interact')}
+            >
+              Interact
+            </button>
+          </div>
+          <div className="hw-keys">
+            <button onClick={() => onPressKey('back')} title="Back">
+              ◁
+            </button>
+            <button onClick={() => onPressKey('home')} title="Home">
+              ○
+            </button>
+            <button onClick={() => onPressKey('recents')} title="Recents">
+              ▢
+            </button>
+          </div>
           <button onClick={onRefresh} disabled={loading}>
             {loading ? 'Capturing…' : 'Refresh'}
           </button>

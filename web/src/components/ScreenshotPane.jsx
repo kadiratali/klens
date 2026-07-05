@@ -1,4 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
+
+// Drags shorter than this (in on-screen px) count as a tap, not a swipe.
+const TAP_SLOP_PX = 8;
+// Holds longer than this before release count as a long-press.
+const LONG_PRESS_MS = 600;
 
 /** Converts a rect in bounds-space to percentage-based CSS so it tracks the
  *  rendered image size with zero resize handling. */
@@ -11,8 +16,21 @@ function rectStyle(rect, space) {
   };
 }
 
-export default function ScreenshotPane({ shot, space, selected, hover, onHover, onClick }) {
+export default function ScreenshotPane({
+  shot,
+  space,
+  mode,
+  selected,
+  hover,
+  onHover,
+  onInspectClick,
+  onTap,
+  onLongPress,
+  onSwipe,
+}) {
   const imgRef = useRef(null);
+  const dragRef = useRef(null);
+  const [feedback, setFeedback] = useState(null); // { xPct, yPct } tap ripple
 
   function toBoundsSpace(e) {
     const box = imgRef.current.getBoundingClientRect();
@@ -20,6 +38,36 @@ export default function ScreenshotPane({ shot, space, selected, hover, onHover, 
       x: ((e.clientX - box.left) / box.width) * space.w,
       y: ((e.clientY - box.top) / box.height) * space.h,
     };
+  }
+
+  function showFeedback(e) {
+    const box = imgRef.current.getBoundingClientRect();
+    setFeedback({
+      xPct: ((e.clientX - box.left) / box.width) * 100,
+      yPct: ((e.clientY - box.top) / box.height) * 100,
+    });
+    setTimeout(() => setFeedback(null), 400);
+  }
+
+  function handleMouseDown(e) {
+    if (mode !== 'interact') return;
+    dragRef.current = { ...toBoundsSpace(e), clientX: e.clientX, clientY: e.clientY, t: Date.now() };
+  }
+
+  function handleMouseUp(e) {
+    if (mode !== 'interact' || !dragRef.current) return;
+    const start = dragRef.current;
+    dragRef.current = null;
+    const end = toBoundsSpace(e);
+    const dist = Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY);
+    const heldMs = Date.now() - start.t;
+    showFeedback(e);
+    if (dist < TAP_SLOP_PX) {
+      if (heldMs >= LONG_PRESS_MS) onLongPress(end.x, end.y, heldMs);
+      else onTap(end.x, end.y);
+    } else {
+      onSwipe(start, end, Math.max(heldMs, 100));
+    }
   }
 
   if (!shot) {
@@ -32,27 +80,37 @@ export default function ScreenshotPane({ shot, space, selected, hover, onHover, 
 
   return (
     <section className="shot-pane">
-      <div className="shot-wrap">
+      <div className={`shot-wrap ${mode}`}>
         <img
           ref={imgRef}
           src={`data:image/png;base64,${shot}`}
           alt="device screenshot"
           draggable={false}
           onMouseMove={(e) => {
+            if (mode !== 'inspect') return;
             const { x, y } = toBoundsSpace(e);
             onHover(x, y);
           }}
-          onMouseLeave={() => onHover(-1, -1)}
-          onClick={(e) => {
-            const { x, y } = toBoundsSpace(e);
-            onClick(x, y);
+          onMouseLeave={() => {
+            dragRef.current = null;
+            onHover(-1, -1);
           }}
+          onClick={(e) => {
+            if (mode !== 'inspect') return;
+            const { x, y } = toBoundsSpace(e);
+            onInspectClick(x, y);
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
         />
-        {hover?.rect && space.w > 0 && (
+        {mode === 'inspect' && hover?.rect && space.w > 0 && (
           <div className="overlay hover-overlay" style={rectStyle(hover.rect, space)} />
         )}
-        {selected?.rect && space.w > 0 && (
+        {mode === 'inspect' && selected?.rect && space.w > 0 && (
           <div className="overlay selected-overlay" style={rectStyle(selected.rect, space)} />
+        )}
+        {feedback && (
+          <div className="tap-ripple" style={{ left: `${feedback.xPct}%`, top: `${feedback.yPct}%` }} />
         )}
       </div>
     </section>

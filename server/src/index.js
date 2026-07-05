@@ -8,6 +8,13 @@ import { parsePageSource } from './xmlParser.js';
 import { diffTrees, countNodes } from './diff.js';
 import { HttpError, classify, FATAL_SESSION_CODES } from './errors.js';
 import { state, appium, resetSession, noteFailure, startHealthLoop } from './session.js';
+import {
+  tapActions,
+  swipeActions,
+  findNodeByPath,
+  rectCenter,
+  ANDROID_KEYCODES,
+} from './actions.js';
 
 const PORT = process.env.PORT || 3100;
 const RACE_GUARD_MAX_ATTEMPTS = 3;
@@ -219,6 +226,106 @@ app.get(
       }
     }
     res.json({ version, tree, ...meta });
+  })
+);
+
+// --- Interaction endpoints ----------------------------------------------------
+// Coordinates are in bounds-space (same space as node rects — device px on Android).
+
+/** Resolve {x,y} directly, or an element `path` to its bounds center via the snapshot. */
+function resolvePoint({ x, y, path: nodePath }) {
+  if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+  if (nodePath) {
+    const node = findNodeByPath(state.snapshot?.tree, nodePath);
+    if (!node) throw new HttpError(409, `Element not found in current snapshot: ${nodePath}. Refresh and retry.`);
+    if (!node.rect) throw new HttpError(409, `Element has no bounds, cannot tap: ${nodePath}`);
+    return rectCenter(node.rect);
+  }
+  throw new HttpError(400, 'Provide x/y coordinates or an element path.');
+}
+
+async function performActions(sessionId, payload) {
+  await appium(`/session/${sessionId}/actions`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 30000,
+  });
+}
+
+app.post(
+  '/api/action/tap',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const pt = resolvePoint(req.body || {});
+    await performActions(sessionId, tapActions(pt.x, pt.y));
+    res.json({ ok: true, tapped: { x: Math.round(pt.x), y: Math.round(pt.y) } });
+  })
+);
+
+app.post(
+  '/api/action/longpress',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const { durationMs = 800 } = req.body || {};
+    const pt = resolvePoint(req.body || {});
+    await performActions(sessionId, tapActions(pt.x, pt.y, durationMs));
+    res.json({ ok: true, pressed: { x: Math.round(pt.x), y: Math.round(pt.y) }, durationMs });
+  })
+);
+
+app.post(
+  '/api/action/swipe',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const { from, to, durationMs = 300 } = req.body || {};
+    if (!from || !to || ![from.x, from.y, to.x, to.y].every(Number.isFinite)) {
+      throw new HttpError(400, 'swipe requires from:{x,y} and to:{x,y}');
+    }
+    await performActions(sessionId, swipeActions(from, to, durationMs));
+    res.json({ ok: true });
+  })
+);
+
+app.post(
+  '/api/action/type',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const { path: nodePath, text, clear = false } = req.body || {};
+    if (!nodePath) throw new HttpError(400, 'type requires an element path');
+    if (typeof text !== 'string') throw new HttpError(400, 'type requires text');
+    const body = await appium(`/session/${sessionId}/element`, {
+      method: 'POST',
+      body: JSON.stringify({ using: 'xpath', value: nodePath }),
+      timeoutMs: 15000,
+    });
+    const el = body.value || {};
+    const elementId = el['element-6066-11e4-a52e-4f735466cecf'] || el.ELEMENT;
+    if (!elementId) throw new HttpError(502, 'Could not locate element on device for typing.');
+    if (clear) {
+      await appium(`/session/${sessionId}/element/${elementId}/clear`, { method: 'POST', body: '{}' });
+    }
+    await appium(`/session/${sessionId}/element/${elementId}/value`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+    res.json({ ok: true });
+  })
+);
+
+app.post(
+  '/api/action/key',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const { name } = req.body || {};
+    const keycode = ANDROID_KEYCODES[name];
+    if (!keycode) {
+      throw new HttpError(400, `Unknown key "${name}". Supported: ${Object.keys(ANDROID_KEYCODES).join(', ')}`);
+    }
+    await appium(`/session/${sessionId}/appium/device/press_keycode`, {
+      method: 'POST',
+      body: JSON.stringify({ keycode }),
+    });
+    res.json({ ok: true });
   })
 );
 

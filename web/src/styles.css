@@ -150,6 +150,75 @@ button.primary {
   }
 }
 
+/* ---- interaction ---- */
+.mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode-switch button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 5px 12px;
+}
+
+.mode-switch button.active {
+  background: var(--accent);
+  color: #0b1017;
+  font-weight: 600;
+}
+
+.hw-keys {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.hw-keys button {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.shot-wrap.interact img {
+  cursor: pointer;
+}
+
+.tap-ripple {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  animation: ripple 0.4s ease-out forwards;
+}
+
+@keyframes ripple {
+  from {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.element-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 10px;
+  flex-wrap: wrap;
+}
+
+.element-actions input {
+  flex: 1;
+  min-width: 140px;
+}
+
 /* ---- layout ---- */
 .main {
   flex: 1;

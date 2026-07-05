@@ -18,10 +18,17 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
     ping'i), `DELETE /api/session`, `POST /api/appium-url`.
   - Hatalar sınıflandırılır (`server/src/errors.js`): ham driver mesajı yerine anlamlı açıklama +
     stabil kod (`uia2-crash`, `wda-crash`, `session-dead`, `appium-unreachable`).
+  - `POST /api/action/*` — etkileşim (Faz 1 / M1): `tap` ve `longpress` (koordinat veya element
+    `path`'i — merkez snapshot'tan hesaplanır), `swipe` (from/to + süre, W3C pointer actions),
+    `type` (XPath ile element bulup sendKeys, opsiyonel `clear`), `key` (back/home/recents).
 - **web/** — Vite + React (dev: 5173, `/api` → 3100 proxy; `vite build` sonrası backend `web/dist`'i
   3100'den servis eder — tek port yeter). Screenshot + XML tree + element detay panelleri; header'da
   canlı sağlık göstergesi, reconnect/tutarsızlık uyarı barları. Node kimliği XPath olduğundan seçim
   refresh'ler arası korunur.
+  - **Inspect / Interact modu** (`i` tuşuyla geçiş): Inspect'te tık element seçer; Interact'ta tık
+    cihaza gerçek tap gönderir, sürükleme swipe olur, 600 ms+ basılı tutma long-press. Header'da
+    back/home/recents tuşları; detay panelinde "Tap element" ve text yazma (Type / Clear & type).
+    Her aksiyondan sonra görünüm otomatik tazelenir (diff ile).
 
 ## Çalıştırma
 
