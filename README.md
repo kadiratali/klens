@@ -2,6 +2,21 @@
 
 Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi element eşleştirme.
 
+## İndir (masaüstü uygulaması)
+
+Hazır kurulumları [GitHub Releases](https://github.com/kadiratali/klens/releases)
+sayfasından indir:
+
+- **macOS** → `klens-<sürüm>-universal.dmg` (Intel + Apple Silicon)
+- **Windows** → `klens-<sürüm>-Setup.exe`
+
+> **Not (imzasız derleme):** uygulama henüz kod imzalı değil.
+> macOS'te ilk açılışta **sağ tık → Aç → Aç** yap (çift tıkta "geliştirici
+> doğrulanamadı" uyarısı çıkar). Windows'ta SmartScreen "More info → Run anyway".
+
+Uygulama içine gömülü kendi Appium proxy sunucusunu (port 3100) çalıştırır; ayrıca
+Node kurulumu gerekmez. Appium server'ın ayrıca çalışıyor olması yeterlidir.
+
 ## Mimari
 
 - **server/** — Node.js + Express (port 3100). Appium server'a W3C REST ile proxy yapar (WebdriverIO'suz):
@@ -71,9 +86,31 @@ kabuğunun içine alır (Appium Inspector benzeri masaüstü uygulaması).
   `i`/`l` klavye kısayollarıyla birebir aynı. Menü aksiyonları `preload.js` üzerinden
   IPC (`menu-action`) ile arayüze iletilir; tarayıcı sürümünde `window.klens` tanımsız
   olduğundan bu kod yolu no-op'tur.
-- **Paketli çalışma** (henüz kapsam dışı ama hazır): Electron main, server'ı bundle'lı
-  Node runtime'ıyla (`ELECTRON_RUN_AS_NODE`) kendisi başlatır ve tek-port URL'ini (`3100`)
-  yükler; kullanıcıda ayrı Node kurulumu gerekmez.
+- **Paketli çalışma**: Electron main, server'ı bundle'lı Node runtime'ıyla
+  (`ELECTRON_RUN_AS_NODE`) kendisi başlatır ve tek-port URL'ini (`3100`) yükler;
+  kullanıcıda ayrı Node kurulumu gerekmez. Server, `esbuild` ile tek dosyaya
+  (`desktop/build/server.cjs`) derlenip `web/dist` ile birlikte kaynak olarak gömülür.
+
+### Paketleme ve yayınlama
+
+Yerel build (bulunduğun platform için):
+
+```sh
+npm run dist            # web build + server bundle + electron-builder
+```
+
+Çıktılar `desktop/dist/` altına düşer (`.dmg` / `.exe`).
+
+**Yayınlama (indirme linki):** bir sürüm tag'i push'la — `.github/workflows/release.yml`
+GitHub Actions macOS ve Windows runner'larında installer'ları build edip
+[GitHub Releases](https://github.com/kadiratali/klens/releases)'e yükler:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Kod imzalama sertifikası eklenene kadar derlemeler imzasızdır (bkz. yukarıdaki not).
 
 ## Appium Inspector'dan farklar
 

@@ -2,11 +2,65 @@
   "name": "klens-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "klens — Appium-based mobile UI inspector (desktop)",
+  "author": "Kadir Atali",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "bundle:server": "esbuild ../server/src/index.js --bundle --platform=node --format=cjs --outfile=build/server.cjs",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^32.2.0"
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0"
+  },
+  "build": {
+    "appId": "com.kadiratali.klens",
+    "productName": "klens",
+    "electronVersion": "32.3.3",
+    "npmRebuild": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/server.cjs",
+        "to": "server.cjs"
+      },
+      {
+        "from": "../web/dist",
+        "to": "web-dist"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "universal"
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": "x64"
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kadiratali",
+        "repo": "klens"
+      }
+    ]
   }
 }

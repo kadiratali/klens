@@ -382,7 +382,11 @@ app.post(
 );
 
 // Serve the built frontend (web/dist) if present, so a single port is enough.
-const distDir = path.resolve(fileURLToPath(import.meta.url), '../../../web/dist');
+// KLENS_DIST_DIR lets the packaged Electron app point at its bundled web assets,
+// which live outside the usual source-relative location.
+const distDir = process.env.KLENS_DIST_DIR
+  ? path.resolve(process.env.KLENS_DIST_DIR)
+  : path.resolve(fileURLToPath(import.meta.url), '../../../web/dist');
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(distDir, 'index.html')));

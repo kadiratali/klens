@@ -146,10 +146,22 @@ Kabul kriteri: `npm run dev:desktop` masaüstü penceresini açmalı, arayüz we
 sürümüyle birebir aynı çalışmalı; menü kısayolları modu/canlı modu değiştirmeli;
 `npm run dev` (tarayıcı) regresyonsuz çalışmaya devam etmeli.
 
-### Milestone 2 — Paketleme (backlog)
+### Milestone 2 — Paketleme + indirme linki ✅
 
-electron-builder ile `.dmg` / `.exe` installer üretimi, uygulama ikonu/marka
-görselleri, opsiyonel otomatik güncelleme. Kod imzalama detayları netleşecek.
+- `esbuild` ile server tek dosyaya (`desktop/build/server.cjs`) bundle'lanır;
+  `web/dist` ile birlikte `extraResources` olarak gömülür (paketli app'te ayrı
+  Node/`node_modules` gerekmez). Server `KLENS_DIST_DIR` env'iyle gömülü frontend'i
+  bulur.
+- electron-builder config (`desktop/package.json` → `build`): macOS `.dmg`
+  (universal) + Windows `.exe` (NSIS). `npm run dist` yerelde üretir.
+- GitHub Actions (`.github/workflows/release.yml`): `v*` tag push'unda mac + win
+  runner'larında build edip GitHub Releases'e publish eder → kalıcı indirme linki.
+- Doğrulama: arm64 `.dmg` yerelde üretildi; paketli `.app` çift tıkla açılıp gömülü
+  server'ı (`ELECTRON_RUN_AS_NODE` → `server.cjs`) başlattı, gömülü `web-dist`'i
+  servis etti, kapanışta server child temizlendi.
+
+Kapsam dışı (sonraki): kod imzalama (Apple Developer ID + Windows sertifikası),
+uygulama ikonu/marka görselleri, otomatik güncelleme (auto-update).
 
 ## Faz 3 — Cross-Version Diffing (planlandı, henüz başlanmadı)
 

@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
     "dev:desktop": "concurrently -n server,web,electron -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w web\" \"npm run start -w desktop\"",
-    "build": "npm run build -w web"
+    "build": "npm run build -w web",
+    "bundle:server": "npm run bundle:server -w desktop",
+    "dist": "npm run build && npm run bundle:server && npm run dist -w desktop"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -20,11 +20,19 @@ const APP_URL = isDev ? DEV_URL : PROD_URL;
 let serverProc = null;
 let win = null;
 
-// In a packaged app, server/ is shipped as an unpacked resource next to the asar.
+// In a packaged app, the server is shipped as a single esbuild bundle
+// (server.cjs) and the built frontend as web-dist/, both under resources/.
+// We run the bundle with the Electron binary as a plain Node runtime.
 function startServer() {
-  const serverEntry = path.join(process.resourcesPath, 'server', 'src', 'index.js');
+  const serverEntry = path.join(process.resourcesPath, 'server.cjs');
+  const distDir = path.join(process.resourcesPath, 'web-dist');
   serverProc = spawn(process.execPath, [serverEntry], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PORT: String(SERVER_PORT) },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      PORT: String(SERVER_PORT),
+      KLENS_DIST_DIR: distDir,
+    },
     stdio: 'inherit',
   });
   serverProc.on('error', (err) => console.error('[klens] server failed to start:', err));
