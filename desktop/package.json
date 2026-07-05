@@ -59,7 +59,8 @@
       {
         "provider": "github",
         "owner": "kadiratali",
-        "repo": "klens"
+        "repo": "klens",
+        "releaseType": "release"
       }
     ]
   }
