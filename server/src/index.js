@@ -1,0 +1,236 @@
+import express from 'express';
+import cors from 'cors';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parsePageSource } from './xmlParser.js';
+import { diffTrees, countNodes } from './diff.js';
+import { HttpError, classify, FATAL_SESSION_CODES } from './errors.js';
+import { state, appium, resetSession, noteFailure, startHealthLoop } from './session.js';
+
+const PORT = process.env.PORT || 3100;
+const RACE_GUARD_MAX_ATTEMPTS = 3;
+const DIFF_MAX_CHURN_RATIO = 0.4; // above this, a full tree is cheaper than a diff
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+const sha1 = (s) => crypto.createHash('sha1').update(s).digest('hex');
+
+function requireSession() {
+  if (state.health.status === 'reconnecting') {
+    const attempt = state.health.reconnect?.attempt ?? 1;
+    throw new HttpError(503, `Reconnecting to device (attempt ${attempt})…`, 'reconnecting');
+  }
+  if (!state.sessionId) {
+    throw new HttpError(409, 'No active session. Attach to or create a session first.', 'no-session');
+  }
+  return state.sessionId;
+}
+
+const wrap = (fn) => (req, res) =>
+  Promise.resolve(fn(req, res)).catch((err) => {
+    // Fatal session errors feed the health machine, which kicks off reconnect.
+    if (FATAL_SESSION_CODES.includes(err.code)) noteFailure(err);
+    const status = err instanceof HttpError ? err.status : 500;
+    const { user } = classify(err.message);
+    res.status(status).json({
+      error: user || err.message,
+      code: err.code || null,
+      detail: user ? err.message : undefined,
+    });
+  });
+
+// --- Connection / session management ---------------------------------------
+
+app.get('/api/state', (req, res) => {
+  res.json({ appiumUrl: state.appiumUrl, sessionId: state.sessionId });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ sessionId: state.sessionId, ...state.health });
+});
+
+app.post('/api/appium-url', (req, res) => {
+  const { appiumUrl } = req.body || {};
+  if (!appiumUrl) return res.status(400).json({ error: 'appiumUrl is required' });
+  state.appiumUrl = appiumUrl;
+  resetSession();
+  res.json({ appiumUrl: state.appiumUrl });
+});
+
+app.get(
+  '/api/sessions',
+  wrap(async (req, res) => {
+    // Appium >= 2.19 exposes /appium/sessions; older servers use /sessions.
+    let body;
+    try {
+      body = await appium('/appium/sessions');
+    } catch {
+      body = await appium('/sessions');
+    }
+    const sessions = (body.value || []).map((s) => ({
+      id: s.id,
+      capabilities: s.capabilities || {},
+    }));
+    res.json({ sessions });
+  })
+);
+
+app.post(
+  '/api/session',
+  wrap(async (req, res) => {
+    const caps = req.body?.capabilities || {};
+    const payload = caps.alwaysMatch || caps.firstMatch
+      ? { capabilities: caps }
+      : { capabilities: { alwaysMatch: caps, firstMatch: [{}] } };
+    const body = await appium('/session', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeoutMs: 120000,
+    });
+    // Remember the payload so we can transparently recreate the session on crash.
+    resetSession({ sessionId: body.value?.sessionId || body.sessionId, capabilities: payload });
+    res.json({ sessionId: state.sessionId, capabilities: body.value?.capabilities || {} });
+  })
+);
+
+app.post(
+  '/api/session/attach',
+  wrap(async (req, res) => {
+    const { sessionId } = req.body || {};
+    if (!sessionId) throw new HttpError(400, 'sessionId is required');
+    // Validate before adopting, so a stale id fails loudly here, not later.
+    await appium(`/session/${sessionId}/window/rect`, { timeoutMs: 5000 });
+    resetSession({ sessionId });
+    res.json({ sessionId });
+  })
+);
+
+app.delete(
+  '/api/session',
+  wrap(async (req, res) => {
+    const quit = req.query.quit === 'true';
+    if (quit && state.sessionId) {
+      await appium(`/session/${state.sessionId}`, { method: 'DELETE' }).catch(() => {});
+    }
+    resetSession();
+    res.json({ ok: true });
+  })
+);
+
+// --- Inspector endpoints -----------------------------------------------------
+
+app.get(
+  '/api/screenshot',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const body = await appium(`/session/${sessionId}/screenshot`);
+    res.json({ base64: body.value });
+  })
+);
+
+app.get(
+  '/api/source',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const body = await appium(`/session/${sessionId}/source`);
+    res.json({ xml: body.value, tree: parsePageSource(body.value) });
+  })
+);
+
+/**
+ * Race-guarded capture: source, then [screenshot ∥ source] in parallel.
+ * If the two source dumps hash the same, the hierarchy was stable while the
+ * screenshot was taken. Otherwise retry; after RACE_GUARD_MAX_ATTEMPTS give
+ * the caller the latest pair flagged consistent: false.
+ */
+async function captureConsistent(sessionId) {
+  const getSource = () => appium(`/session/${sessionId}/source`).then((b) => b.value);
+  const getShot = () => appium(`/session/${sessionId}/screenshot`).then((b) => b.value);
+
+  let before = await getSource();
+  let base64;
+  let xml;
+  for (let attempt = 1; attempt <= RACE_GUARD_MAX_ATTEMPTS; attempt++) {
+    [base64, xml] = await Promise.all([getShot(), getSource()]);
+    if (sha1(xml) === sha1(before)) {
+      return { base64, xml, consistent: true, attempts: attempt };
+    }
+    before = xml;
+  }
+  return { base64, xml, consistent: false, attempts: RACE_GUARD_MAX_ATTEMPTS };
+}
+
+/**
+ * One-shot inspect: screenshot + source with race guard and incremental diff.
+ * Pass ?since=<version> (the version the client already has). Response is one of:
+ *   { version, unchanged: true, base64, ... }        — hierarchy identical
+ *   { version, baseVersion, diff, base64, ... }      — apply diff to your tree
+ *   { version, tree, base64, ... }                   — full tree
+ */
+app.get(
+  '/api/inspect',
+  wrap(async (req, res) => {
+    const sessionId = requireSession();
+    const since = req.query.since != null ? Number(req.query.since) : null;
+
+    const capture = await captureConsistent(sessionId);
+    const meta = {
+      base64: capture.base64,
+      consistent: capture.consistent,
+      attempts: capture.attempts,
+    };
+
+    const xmlHash = sha1(capture.xml);
+    const prev = state.snapshot;
+    if (prev && prev.xmlHash === xmlHash) {
+      // "unchanged" is only meaningful if the client actually has our version;
+      // otherwise hand it the stored tree so it can't keep a stale one.
+      if (since === prev.version) {
+        return res.json({ version: prev.version, unchanged: true, ...meta });
+      }
+      return res.json({ version: prev.version, tree: prev.tree, ...meta });
+    }
+
+    const tree = parsePageSource(capture.xml);
+    const version = (prev?.version || 0) + 1;
+    state.snapshot = { version, xmlHash, tree };
+
+    if (prev && since === prev.version) {
+      const diff = diffTrees(prev.tree, tree);
+      if (diff) {
+        const churn = diff.added.length + diff.removed.length + diff.changed.length;
+        if (churn <= countNodes(tree) * DIFF_MAX_CHURN_RATIO) {
+          return res.json({
+            version,
+            baseVersion: prev.version,
+            diff,
+            stats: {
+              added: diff.added.length,
+              removed: diff.removed.length,
+              changed: diff.changed.length,
+            },
+            ...meta,
+          });
+        }
+      }
+    }
+    res.json({ version, tree, ...meta });
+  })
+);
+
+// Serve the built frontend (web/dist) if present, so a single port is enough.
+const distDir = path.resolve(fileURLToPath(import.meta.url), '../../../web/dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(distDir, 'index.html')));
+}
+
+app.listen(PORT, () => {
+  console.log(`klens server listening on http://localhost:${PORT}`);
+  console.log(`Appium target: ${state.appiumUrl}`);
+  startHealthLoop();
+});
