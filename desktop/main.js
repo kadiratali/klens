@@ -12,6 +12,10 @@ const http = require('node:http');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 
+// Packaged builds get their name from the bundle; in dev the binary is plain
+// "Electron", so set it explicitly for the dock tooltip and app menu.
+app.setName('klens');
+
 const isDev = !app.isPackaged;
 const SERVER_PORT = process.env.PORT || 3100;
 const DEV_URL = 'http://localhost:5173';
