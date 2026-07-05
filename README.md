@@ -15,6 +15,7 @@
   <a href="https://github.com/kadiratali/klens/releases"><img src="https://img.shields.io/github/downloads/kadiratali/klens/total?label=downloads" alt="downloads" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="platforms" />
   <img src="https://img.shields.io/badge/target-Android%20%7C%20iOS-3ddc84" alt="targets" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/kadiratali/klens" alt="license" /></a>
 </p>
 
 ---
