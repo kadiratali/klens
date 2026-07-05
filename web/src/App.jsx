@@ -181,6 +181,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Native menu actions from the Electron shell mirror the 'i'/'l' shortcuts.
+  // In the browser build `window.klens` is undefined, so this is a no-op.
+  useEffect(() => {
+    return window.klens?.onMenuAction((action) => {
+      if (action === 'toggle-mode') setMode((m) => (m === 'inspect' ? 'interact' : 'inspect'));
+      if (action === 'toggle-live') setLive((v) => !v);
+    });
+  }, []);
+
   // Runs a device action, then re-captures so the view follows the device.
   const runAction = useCallback(
     async (fn) => {

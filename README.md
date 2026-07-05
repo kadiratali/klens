@@ -50,12 +50,30 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
 
 ```sh
 npm install
-npm run dev        # server + web birlikte
+npm run dev        # server + web birlikte (tarayıcı)
+npm run dev:desktop # server + web + Electron penceresi (masaüstü)
 ```
 
-Sonra `http://localhost:5173` → Appium URL'ini gir → **List sessions** → **Attach** (veya **New session…** ile capabilities JSON'u vererek yeni session aç) → **Refresh**.
+Tarayıcı için: `http://localhost:5173` → Appium URL'ini gir → **List sessions** → **Attach** (veya **New session…** ile capabilities JSON'u vererek yeni session aç) → **Refresh**. Masaüstü sürümünde aynı arayüz doğrudan Electron penceresinde açılır.
 
 Ortam değişkenleri: `APPIUM_URL` (varsayılan `http://127.0.0.1:4723`), `PORT` (backend, varsayılan 3100).
+
+## Masaüstü (Electron)
+
+`desktop/` — mevcut Express server ve React arayüzünü değiştirmeden bir Electron
+kabuğunun içine alır (Appium Inspector benzeri masaüstü uygulaması).
+
+- **Dev** (`npm run dev:desktop`): server + Vite `concurrently` ile başlar, Electron
+  penceresi Vite dev URL'ini (`5173`) yükler — HMR aynen çalışır. Pencere, hedef URL
+  cevap verene kadar `waitForUrl` ile bekler (soğuk başlangıçta boş ekran olmaz).
+- **Native menü**: standart roller (reload, devtools, zoom, kopyala/yapıştır) + "klens"
+  menüsü: **Toggle Inspect/Interact** (Cmd/Ctrl+I) ve **Toggle Live** (Cmd/Ctrl+L) —
+  `i`/`l` klavye kısayollarıyla birebir aynı. Menü aksiyonları `preload.js` üzerinden
+  IPC (`menu-action`) ile arayüze iletilir; tarayıcı sürümünde `window.klens` tanımsız
+  olduğundan bu kod yolu no-op'tur.
+- **Paketli çalışma** (henüz kapsam dışı ama hazır): Electron main, server'ı bundle'lı
+  Node runtime'ıyla (`ELECTRON_RUN_AS_NODE`) kendisi başlatır ve tek-port URL'ini (`3100`)
+  yükler; kullanıcıda ayrı Node kurulumu gerekmez.
 
 ## Appium Inspector'dan farklar
 
