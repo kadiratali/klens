@@ -1,0 +1,42 @@
+name: Release
+
+# Push a version tag (e.g. v0.1.0) to build installers on each OS runner and
+# publish them to a GitHub Release. The Release page is the permanent download
+# link — macOS gets a .dmg, Windows a .exe (NSIS installer).
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # electron-builder needs this to create the Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web frontend
+        run: npm run build
+
+      - name: Bundle server
+        run: npm run bundle:server
+
+      - name: Build & publish installer
+        run: npm run dist -w desktop -- --publish always
+        env:
+          # Provided automatically by GitHub Actions; electron-builder uploads
+          # the artifacts to the Release for the pushed tag.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

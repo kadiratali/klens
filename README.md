@@ -2,6 +2,21 @@
 
 Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi element eşleştirme.
 
+## İndir (masaüstü uygulaması)
+
+Hazır kurulumları [GitHub Releases](https://github.com/kadiratali/klens/releases)
+sayfasından indir:
+
+- **macOS** → `klens-<sürüm>-universal.dmg` (Intel + Apple Silicon)
+- **Windows** → `klens-<sürüm>-Setup.exe`
+
+> **Not (imzasız derleme):** uygulama henüz kod imzalı değil.
+> macOS'te ilk açılışta **sağ tık → Aç → Aç** yap (çift tıkta "geliştirici
+> doğrulanamadı" uyarısı çıkar). Windows'ta SmartScreen "More info → Run anyway".
+
+Uygulama içine gömülü kendi Appium proxy sunucusunu (port 3100) çalıştırır; ayrıca
+Node kurulumu gerekmez. Appium server'ın ayrıca çalışıyor olması yeterlidir.
+
 ## Mimari
 
 - **server/** — Node.js + Express (port 3100). Appium server'a W3C REST ile proxy yapar (WebdriverIO'suz):
@@ -50,12 +65,52 @@ Appium tabanlı mobil UI inspector. Faz 1: Appium Inspector paritesi + daha iyi 
 
 ```sh
 npm install
-npm run dev        # server + web birlikte
+npm run dev        # server + web birlikte (tarayıcı)
+npm run dev:desktop # server + web + Electron penceresi (masaüstü)
 ```
 
-Sonra `http://localhost:5173` → Appium URL'ini gir → **List sessions** → **Attach** (veya **New session…** ile capabilities JSON'u vererek yeni session aç) → **Refresh**.
+Tarayıcı için: `http://localhost:5173` → Appium URL'ini gir → **List sessions** → **Attach** (veya **New session…** ile capabilities JSON'u vererek yeni session aç) → **Refresh**. Masaüstü sürümünde aynı arayüz doğrudan Electron penceresinde açılır.
 
 Ortam değişkenleri: `APPIUM_URL` (varsayılan `http://127.0.0.1:4723`), `PORT` (backend, varsayılan 3100).
+
+## Masaüstü (Electron)
+
+`desktop/` — mevcut Express server ve React arayüzünü değiştirmeden bir Electron
+kabuğunun içine alır (Appium Inspector benzeri masaüstü uygulaması).
+
+- **Dev** (`npm run dev:desktop`): server + Vite `concurrently` ile başlar, Electron
+  penceresi Vite dev URL'ini (`5173`) yükler — HMR aynen çalışır. Pencere, hedef URL
+  cevap verene kadar `waitForUrl` ile bekler (soğuk başlangıçta boş ekran olmaz).
+- **Native menü**: standart roller (reload, devtools, zoom, kopyala/yapıştır) + "klens"
+  menüsü: **Toggle Inspect/Interact** (Cmd/Ctrl+I) ve **Toggle Live** (Cmd/Ctrl+L) —
+  `i`/`l` klavye kısayollarıyla birebir aynı. Menü aksiyonları `preload.js` üzerinden
+  IPC (`menu-action`) ile arayüze iletilir; tarayıcı sürümünde `window.klens` tanımsız
+  olduğundan bu kod yolu no-op'tur.
+- **Paketli çalışma**: Electron main, server'ı bundle'lı Node runtime'ıyla
+  (`ELECTRON_RUN_AS_NODE`) kendisi başlatır ve tek-port URL'ini (`3100`) yükler;
+  kullanıcıda ayrı Node kurulumu gerekmez. Server, `esbuild` ile tek dosyaya
+  (`desktop/build/server.cjs`) derlenip `web/dist` ile birlikte kaynak olarak gömülür.
+
+### Paketleme ve yayınlama
+
+Yerel build (bulunduğun platform için):
+
+```sh
+npm run dist            # web build + server bundle + electron-builder
+```
+
+Çıktılar `desktop/dist/` altına düşer (`.dmg` / `.exe`).
+
+**Yayınlama (indirme linki):** bir sürüm tag'i push'la — `.github/workflows/release.yml`
+GitHub Actions macOS ve Windows runner'larında installer'ları build edip
+[GitHub Releases](https://github.com/kadiratali/klens/releases)'e yükler:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Kod imzalama sertifikası eklenene kadar derlemeler imzasızdır (bkz. yukarıdaki not).
 
 ## Appium Inspector'dan farklar
 
