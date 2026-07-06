@@ -6,7 +6,7 @@
 // bundled Electron binary as a plain Node runtime (ELECTRON_RUN_AS_NODE) so the
 // end user does not need Node installed — and load the single-port server URL.
 
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require('electron');
 const path = require('node:path');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -28,6 +28,101 @@ const ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
 let serverProc = null;
 let win = null;
+
+// --- Locator export prefs -------------------------------------------------
+// A tiny JSON blob in userData holds the user's constant template and the
+// files they've recently exported to. Kept intentionally simple (no schema
+// migration) — on any read error we fall back to defaults.
+const PREFS_PATH = path.join(app.getPath('userData'), 'klens-prefs.json');
+const DEFAULT_PREFS = {
+  template: 'public static final String {name} = "{selector}";',
+  recentFiles: [],
+};
+const MAX_RECENT = 8;
+
+function readPrefs() {
+  try {
+    return { ...DEFAULT_PREFS, ...JSON.parse(fs.readFileSync(PREFS_PATH, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+
+function writePrefs(prefs) {
+  try {
+    fs.writeFileSync(PREFS_PATH, JSON.stringify(prefs, null, 2));
+  } catch (err) {
+    console.error('[klens] failed to write prefs:', err.message);
+  }
+}
+
+function registerExportIpc() {
+  ipcMain.handle('klens:get-prefs', () => readPrefs());
+
+  ipcMain.handle('klens:set-prefs', (_e, patch) => {
+    const next = { ...readPrefs(), ...patch };
+    writePrefs(next);
+    return next;
+  });
+
+  ipcMain.handle('klens:choose-file', async () => {
+    const res = await dialog.showOpenDialog(win, {
+      title: 'Choose a file to append locators to',
+      properties: ['openFile'],
+    });
+    if (res.canceled || !res.filePaths.length) return null;
+    return res.filePaths[0];
+  });
+
+  ipcMain.handle('klens:append', (_e, { filePath, line }) => {
+    try {
+      let original = '';
+      try {
+        original = fs.readFileSync(filePath, 'utf8');
+      } catch {
+        // File may have been removed since it was picked; recreate it below.
+      }
+      fs.writeFileSync(filePath, insertLine(original, line));
+      // Bump to the front of the recent list on successful use.
+      const prefs = readPrefs();
+      const recentFiles = [filePath, ...prefs.recentFiles.filter((f) => f !== filePath)].slice(
+        0,
+        MAX_RECENT
+      );
+      writePrefs({ ...prefs, recentFiles });
+      return { ok: true, recentFiles };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+}
+
+// Copy the leading whitespace of the last indented line — so an inserted field
+// lines up with the existing ones (tabs or 2/4 spaces). Falls back to 4 spaces.
+function detectIndent(text) {
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^([ \t]+)\S/);
+    if (m) return m[1];
+  }
+  return '    ';
+}
+
+// Place `line` inside the file. If the file ends with a class/namespace body
+// (last non-space char is `}`), insert just before that closing brace, indented
+// to match — otherwise a naive append would land outside the class. For plain
+// files (module-level constants) append at the end.
+function insertLine(original, line) {
+  const endsWithBrace = original.replace(/\s+$/, '').endsWith('}');
+  if (endsWithBrace) {
+    const braceIdx = original.lastIndexOf('}');
+    const before = original.slice(0, braceIdx).replace(/\s*$/, '\n');
+    const after = original.slice(braceIdx);
+    return `${before}${detectIndent(before)}${line}\n${after}`;
+  }
+  const sep = original.length && !original.endsWith('\n') ? '\n' : '';
+  return `${original}${sep}${line}\n`;
+}
 
 // In a packaged app, the server is shipped as a single esbuild bundle
 // (server.cjs) and the built frontend as web-dist/, both under resources/.
@@ -134,6 +229,7 @@ app.whenReady().then(async () => {
   }
   if (!isDev) startServer();
   buildMenu();
+  registerExportIpc();
   await createWindow();
 
   app.on('activate', () => {
