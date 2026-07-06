@@ -26,7 +26,7 @@ tells you **which selector is robust and why**. Point it at a local emulator or 
 cloud device (BrowserStack) and inspect, tap, type, and generate locators.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="klens inspecting an iOS app on a BrowserStack device — screen, element tree, attributes, and robustness-scored locators" width="900" />
+  <img src="assets/demo.gif" alt="klens inspecting an Android app — pick an element and get robustness-scored locators" width="900" />
 </p>
 
 ## ✨ Why klens
